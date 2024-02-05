@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/select.h>
 
 int main() {
 	// Disable output buffering
@@ -54,28 +55,54 @@ int main() {
 
 	 client_addr_len = sizeof(client_addr);
 
+	 fd_set master, current;
+	 FD_SET(server_fd, &master);
+	 int max_socket_fd = server_fd+1;
      int client_fd;
-     client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
-	printf("Client connected\n");
+	 char buffer[128];
+	 int nbytes, sentBytes;
+
 	 for(;;){
-         char buffer[128];
-         int nbytes = recv(client_fd, buffer, sizeof buffer, 0);
-         buffer[nbytes]='\0';
-         if(nbytes<=0){
-			 if(nbytes==0){
-				 printf("Connection Closed\n");
+		 current = master;
+		 if(select(max_socket_fd,&current,NULL,NULL,NULL)==-1){
+			 perror("select\n");
+		 }
+		 for(int i=0; i<=max_socket_fd; i++){
+			 if(FD_ISSET(i, &current)){
+				 if(i==server_fd){
+					 client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+					 if(client_fd==-1){
+						 perror("accept\n");
+					 }
+					 FD_SET(client_fd, &master);
+					 if(client_fd>max_socket_fd){
+						 max_socket_fd = client_fd+1;
+					 }
+					 printf("Client connected at socket %d\n", client_fd);
+				 }
+			 	else{
+					 nbytes = recv(i, buffer, sizeof buffer, 0);
+					 buffer[nbytes]='\0';
+					 if(nbytes<=0){
+						 if(nbytes==0){
+							 printf("Connection closed at socket %d\n", i);
+						 }
+						 else{
+							 perror("receive\n");
+						 }
+						 close(i); // bye!
+						 FD_CLR(i, &master);
+						 break;
+					 }
+					 if( (sentBytes = send(i, pingMessage, strlen( pingMessage ), 0))==-1){
+						 perror("send\n");
+					 }
+				 }
 			 }
-			 else{
-				 perror("receive\n");
-				 return 1;
-			 }
-			 break;
-             //printf("Recieved Message: %s", buffer);
-         }
-         int sentBytes;
-         if( (sentBytes = send(client_fd, pingMessage, strlen( pingMessage ), 0))==-1){
-             perror("send");
-         }
+		 }
+
+
+		 //printf("Recieved Message: %s", buffer);
      }
 	 close(server_fd);
 
