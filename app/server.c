@@ -61,7 +61,7 @@ int main() {
      int client_fd;
 	 char buffer[128];
 	 int nbytes, sentBytes;
-	 int send_fd ;
+
 	 for(;;){
 		 current = master;
 		 if(select(max_socket_fd,&current,NULL,NULL,NULL)==-1){
@@ -69,37 +69,36 @@ int main() {
 		 }
 		 for(int i=0; i<=max_socket_fd; i++){
 			 if(FD_ISSET(i, &current)){
-				 send_fd = i;
 				 if(i==server_fd){
 					 client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
 					 if(client_fd==-1){
 						 perror("accept\n");
 					 }
 					 FD_SET(client_fd, &master);
-					 if(client_fd>max_socket_fd){
+					 if(client_fd>=max_socket_fd){
 						 max_socket_fd = client_fd+1;
 					 }
-					 send_fd = client_fd;
 					 printf("Client connected at socket %d\n", client_fd);
 				 }
-
-				 nbytes = recv(send_fd, buffer, sizeof buffer, 0);
-				 buffer[nbytes]='\0';
-				 if(nbytes<=0){
-					 if(nbytes==0){
-						 printf("Connection closed at socket %d\n", i);
+			 	else{
+					 nbytes = recv(i, buffer, sizeof buffer, 0);
+					 buffer[nbytes]='\0';
+					 if(nbytes<=0){
+						 if(nbytes==0){
+							 printf("Connection closed at socket %d\n", i);
+						 }
+						 else{
+							 perror("receive\n");
+						 }
+						 close(i); // bye!
+						 FD_CLR(i, &master);
+						 break;
 					 }
-					 else{
-						 perror("receive\n");
+					 printf("Recieved Message %s\n", buffer);
+					 if( (sentBytes = send(i, pingMessage, strlen( pingMessage ), 0))==-1){
+						 perror("send\n");
 					 }
-					 close(i); // bye!
-					 FD_CLR(i, &master);
-					 break;
 				 }
-				 if( (sentBytes = send(send_fd, pingMessage, strlen( pingMessage ), 0))==-1){
-					 perror("send\n");
-				 }
-
 			 }
 		 }
 
