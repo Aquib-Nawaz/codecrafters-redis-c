@@ -57,7 +57,7 @@ int main() {
 	 char* pingMessage = "+PONG\r\n";
 	 char buffer[128];
 	 int nbytes = recv(client_fd, buffer, sizeof buffer, 0);
-	 send(client_fd, pingMessage, sizeof pingMessage, 0);
+	 send(client_fd, pingMessage, sizeof pingMessage -1, 0);
 	 close(server_fd);
 
 	return 0;
