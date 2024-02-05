@@ -55,8 +55,9 @@ int main() {
 	 client_addr_len = sizeof(client_addr);
 
      int client_fd;
+     client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
      for(int i=0;i<2;i++){
-         client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+
          printf("Client connected\n");
 
          char buffer[128];
