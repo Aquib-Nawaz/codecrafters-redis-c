@@ -50,14 +50,26 @@ int main() {
 	 }
 
 	 printf("Waiting for a client to connect...\n");
+     char* pingMessage = "+PONG\r\n";
 
 	 client_addr_len = sizeof(client_addr);
-	 int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
-	 printf("Client connected\n");
-	 char* pingMessage = "+PONG\r\n";
-	 char buffer[128];
-	 int nbytes = recv(client_fd, buffer, sizeof buffer, 0);
-	 send(client_fd, pingMessage, sizeof pingMessage -1, 0);
+
+     int client_fd;
+     for(int i=0;i<2;i++){
+         client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+         printf("Client connected\n");
+
+         char buffer[128];
+         int nbytes = recv(client_fd, buffer, sizeof buffer, 0);
+         buffer[nbytes]='\0';
+         if(nbytes>0){
+             printf("Recieved Message: %s", buffer);
+         }
+         int sentBytes;
+         if( (sentBytes = send(client_fd, pingMessage, strlen( pingMessage ), 0))==-1){
+             perror("send");
+         }
+     }
 	 close(server_fd);
 
 	return 0;
