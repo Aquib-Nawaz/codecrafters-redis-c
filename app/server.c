@@ -56,15 +56,21 @@ int main() {
 
      int client_fd;
      client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
-     for(int i=0;i<2;i++){
-
-         printf("Client connected\n");
-
+	printf("Client connected\n");
+	 for(;;){
          char buffer[128];
          int nbytes = recv(client_fd, buffer, sizeof buffer, 0);
          buffer[nbytes]='\0';
-         if(nbytes>0){
-             printf("Recieved Message: %s", buffer);
+         if(nbytes<=0){
+			 if(nbytes==0){
+				 printf("Connection Closed\n");
+			 }
+			 else{
+				 perror("receive\n");
+				 return 1;
+			 }
+			 break;
+             //printf("Recieved Message: %s", buffer);
          }
          int sentBytes;
          if( (sentBytes = send(client_fd, pingMessage, strlen( pingMessage ), 0))==-1){
