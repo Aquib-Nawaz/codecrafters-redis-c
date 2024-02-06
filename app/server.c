@@ -7,6 +7,59 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <ctype.h>
+
+void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
+	int newMsg = 0, newKeyword=0, keywordLen=0, keywordNum=-1;
+	for(int i=0; i<msgSize; i++){
+		char c = message[i];
+		switch(c){
+			case '*':
+				newMsg = 1;
+				*arrayLen=0;
+				printf("New Message\n");
+				break;
+			case '$':
+				newKeyword = 1;
+				keywordNum+=1;
+				keywordLen = 0;
+				printf("New Keyword\n");
+				break;
+			case '\r':
+				if(newMsg){
+					newMsg = 0;
+					*commands = (char**)malloc(sizeof(char *)*(*arrayLen));
+				}
+				else if(newKeyword){
+					(*commands)[keywordNum] = (char*)malloc(keywordLen+1);
+				}
+				break;
+			case '\n':
+				if(newKeyword){
+					printf("Copying %d chars from position %d to command pos %d\n", keywordLen, i+1, keywordNum);
+					strncpy((*commands)[keywordNum], message+i+1, keywordLen);
+					(*commands)[keywordNum][keywordLen] = '\0';
+					i+=keywordLen;
+					newKeyword=0;
+				}
+				break;
+			default:
+				if(isdigit(c)){
+					if(newMsg){
+						*arrayLen = *arrayLen*10 + c-'0';
+					}
+					else if(newKeyword){
+						keywordLen = keywordLen*10 + c-'0';
+					}
+				}
+		}
+	}
+
+}
+
+void toLower(char * p){
+	for ( ; *p; ++p) *p = tolower(*p);
+}
 
 int main() {
 	// Disable output buffering
@@ -61,6 +114,11 @@ int main() {
      int client_fd;
 	 char buffer[128];
 	 int nbytes, sentBytes;
+	 char ** commands;
+	 int commandLen;
+
+	 char* echo = "echo";
+	 char* ping = "ping";
 
 	 for(;;){
 		 current = master;
@@ -82,7 +140,6 @@ int main() {
 				 }
 			 	else{
 					 nbytes = recv(i, buffer, sizeof buffer, 0);
-					 buffer[nbytes]='\0';
 					 if(nbytes<=0){
 						 if(nbytes==0){
 							 printf("Connection closed at socket %d\n", i);
@@ -94,16 +151,29 @@ int main() {
 						 FD_CLR(i, &master);
 						 break;
 					 }
-					 printf("Recieved Message %s\n", buffer);
-					 if( (sentBytes = send(i, pingMessage, strlen( pingMessage ), 0))==-1){
-						 perror("send\n");
+					 deCodeRedisMessage(buffer, nbytes, &commands, &commandLen);
+					 if(commandLen>0){
+						 toLower(commands[0]);
+						 if(strcmp(ping, commands[0])==0){
+							 if( (sentBytes = send(i, pingMessage, strlen( pingMessage ), 0))==-1){
+								 perror("send\n");
+							 }
+						 }
+						 else if(strcmp(echo, commands[0])==0 && commandLen>1){
+							 int msgLen = strlen(commands[1]);
+							 char* writeBuffer = (char*)malloc(msgLen+3);
+							 *writeBuffer = '+';
+							 strcpy(writeBuffer+1,commands[1]);
+							 writeBuffer[msgLen+1]='\r';
+							 writeBuffer[msgLen+2]='\n';
+							 if( (sentBytes = send(i, writeBuffer, msgLen+3, 0))==-1){
+								 perror("send\n");
+							 }
+						 }
 					 }
 				 }
 			 }
 		 }
-
-
-		 //printf("Recieved Message: %s", buffer);
      }
 	 close(server_fd);
 
