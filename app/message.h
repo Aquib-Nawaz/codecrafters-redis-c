@@ -13,7 +13,7 @@ static char* pingMessage = "+PONG\r\n";
 static char* get = "get";
 static char* set = "set";
 static char* ok = "+OK\r\n";
-static char* nil = "+nil\r\n";
+static char* nil = "nil";
 
 #endif //REDIS_MESSAGE_H
 

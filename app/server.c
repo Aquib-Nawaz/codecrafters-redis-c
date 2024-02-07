@@ -52,6 +52,8 @@ char* do_get(char** commands, int commandLen){
 			.hcode = hash(commands[1])
 	};
 	struct HNode* node = hm_lookup(&g_data.db, &key, entry_eq);
+	if(!node)
+		return nil;
 	return container_of(node, struct Entry, node)->value;
 }
 
@@ -179,7 +181,7 @@ int main() {
 					 }
 					 deCodeRedisMessage(buffer, nbytes, &commands, &commandLen);
                      parseMessage(commands, commandLen, i);
-					 for(int k=0; k<commandLen; k++){free(commands[i]);}
+//					 for(int k=0; k<commandLen; k++){free(commands[i]);}
 					 free(commands);
 				 }
 			 }
