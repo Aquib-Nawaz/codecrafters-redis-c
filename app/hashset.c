@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <printf.h>
 
 static void h_init(struct HTab *htab, size_t n) {
     assert(n>0 && (n&(n-1))==0);
@@ -46,6 +47,9 @@ static struct HNode *h_detach(struct HTab *htab, struct HNode **from) {
 const size_t k_resizing_work = 128; // constant work
 
 static void hm_help_resizing(struct HMap *hmap) {
+    if (hmap->t2.tab == NULL) {
+        return;
+    }
     size_t nwork = 0;
     while (nwork<k_resizing_work && hmap->t2.size>0){
 
@@ -121,7 +125,7 @@ size_t hm_size(struct HMap *hmap){
 void hm_destroy(struct HMap *hmap){
     free(hmap->t1.tab);
     free(hmap->t2.tab);
-    *hmap = (struct HMap){};
+    *hmap = (struct HMap){0};
 }
 unsigned long hash( char *str)
 {
@@ -136,21 +140,77 @@ unsigned long hash( char *str)
 
 int serialize_str(char **writeBuffer, char* str){
     size_t str_len = strlen(str);
-    *writeBuffer = calloc(str_len+3, sizeof (char ));
+    *writeBuffer = calloc(str_len+4, sizeof (char ));
     (*writeBuffer)[0] = '+';
     strcpy(*writeBuffer+1, str);
     strcpy(*writeBuffer+1+str_len, "\r\n");
-    return str_len+3;
+    return str_len+4;
 }
-//struct Entry* entry_init(char* key, char* value){
-//    struct Entry *entry = malloc(sizeof (struct Entry));
-//    if(!entry)
-//        return NULL;
-//    entry->key = key;
-//    entry->value = value;
-//    entry->node->hcode = hash(key);
-//    return entry;
-//}
 
+#if 0
+#define container_of(ptr, type, member) ({                  \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+    (type *)( (char *)__mptr - offsetof(type, member) );})
+
+struct Entry{
+    struct HNode node;
+    char* key;
+    char* value;
+};
+
+static struct {
+    struct HMap db;
+} g_data;
+
+static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
+    struct Entry *le = container_of(lhs, struct Entry, node);
+    struct Entry *re = container_of(rhs, struct Entry, node);
+    return strcmp(le->key, re->key)==0;
+}
+
+void do_set (char **commands, int commandLen){
+    if(commandLen<3)
+        return;
+    struct HNode keyN={
+            .hcode = hash(commands[1])
+    };
+    struct HNode* node = hm_lookup(&g_data.db, &keyN, entry_eq);
+    char* key = commands[1], *value = commands[2];
+    if(node){
+        struct Entry * existing = container_of(node, struct Entry, node);
+        free(existing->value);
+        existing->value = malloc(strlen(value)+1);
+        strcpy(existing->value, value);
+        return;
+    }
+    struct Entry *entry = calloc(1, sizeof (struct Entry));
+    entry->key = malloc(strlen(key)+1);
+    entry->value = malloc(strlen(value)+1);
+    strcpy(entry->key, key);
+    strcpy(entry->value, value);
+    entry->node.hcode = hash(key);
+    hm_insert(&g_data.db, &entry->node);
+}
+
+char* do_get(char** commands, int commandLen){
+    if(commandLen<2)
+        return NULL;
+    struct Entry key;
+    key.node.hcode = hash(commands[1]);
+    key.key = commands[1];
+    struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
+    if(!node)
+        return "nil";
+    return container_of(node, struct Entry, node)->value;
+}
+
+int main(void){
+    char * commands[] = {"set", "randomkey", "randomvalue"};
+    do_set(commands, 3);
+    char** commands2 = (char* []) {"get", "randomkey"};
+    char* ret = do_get(commands2, 2);
+    assert(strcmp(commands[2], ret)==0);
+}
+#endif
 
 

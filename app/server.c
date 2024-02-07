@@ -29,31 +29,43 @@ static struct {
 static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
 	struct Entry *le = container_of(lhs, struct Entry, node);
 	struct Entry *re = container_of(rhs, struct Entry, node);
-	return le->key == re->key;
+	return strcmp(le->key, re->key)==0;
 }
 
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
 		return;
-	struct Entry entry;
+	struct HNode keyN={
+			.hcode = hash(commands[1])
+	};
+	struct HNode* node = hm_lookup(&g_data.db, &keyN, entry_eq);
 	char* key = commands[1], *value = commands[2];
-	entry.key = malloc(strlen(key)+1);
-	entry.value = malloc(strlen(value)+1);
-	strcpy(entry.key, key);
-	strcpy(entry.value, value);
-	entry.node.hcode = hash(key);
-	hm_insert(&g_data.db, &entry.node);
+	if(node){
+		struct Entry * existing = container_of(node, struct Entry, node);
+		free(existing->value);
+		existing->value = malloc(strlen(value)+1);
+		strcpy(existing->value, value);
+		return;
+	}
+	struct Entry *entry = calloc(1, sizeof (struct Entry));
+	entry->key = malloc(strlen(key)+1);
+	entry->value = malloc(strlen(value)+1);
+	strcpy(entry->key, key);
+	strcpy(entry->value, value);
+	entry->node.hcode = hash(key);
+	entry->node.next = NULL;
+	hm_insert(&g_data.db, &entry->node);
 }
 
 char* do_get(char** commands, int commandLen){
 	if(commandLen<2)
 		return NULL;
-	struct HNode key={
-			.hcode = hash(commands[1])
-	};
-	struct HNode* node = hm_lookup(&g_data.db, &key, entry_eq);
+	struct Entry key;
+	key.node.hcode = hash(commands[1]);
+	key.key = commands[1];
+	struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
 	if(!node)
-		return nil;
+		return "nil";
 	return container_of(node, struct Entry, node)->value;
 }
 
