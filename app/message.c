@@ -13,6 +13,7 @@ void toLower(char * p){
 
 void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
     int newMsg = 0, newKeyword=0, keywordLen=0, keywordNum=-1;
+    printf("Decoding Message:- %s\n", message);
     for(int i=0; i<msgSize; i++){
         char c = message[i];
         switch(c){
@@ -38,7 +39,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
                 break;
             case '\n':
                 if(newKeyword){
-                    printf("Copying %d chars from position %d to command pos %d\n", keywordLen, i+1, keywordNum);
+                    printf("Copying %s from position %d to command pos %d\n", message+i+1, i+1, keywordNum);
                     strncpy((*commands)[keywordNum], message+i+1, keywordLen);
                     (*commands)[keywordNum][keywordLen] = '\0';
                     i+=keywordLen;
