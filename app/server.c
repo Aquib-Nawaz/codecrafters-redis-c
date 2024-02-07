@@ -12,25 +12,9 @@
 #include "message.h"
 #include "hashset.h"
 
-#define container_of(ptr, type, member) ({                  \
-    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-    (type *)( (char *)__mptr - offsetof(type, member) );})
-
-struct Entry{
-	struct HNode node;
-	char* key;
-	char* value;
-};
-
 static struct {
 	struct HMap db;
 } g_data;
-
-static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
-	struct Entry *le = container_of(lhs, struct Entry, node);
-	struct Entry *re = container_of(rhs, struct Entry, node);
-	return strcmp(le->key, re->key)==0;
-}
 
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
@@ -45,6 +29,9 @@ void do_set (char **commands, int commandLen){
 		free(existing->value);
 		existing->value = malloc(strlen(value)+1);
 		strcpy(existing->value, value);
+		if(commandLen==5){
+			existing->expiry=strtol(commands[4],NULL, 10)/1000 + time(NULL);
+		}
 		return;
 	}
 	struct Entry *entry = calloc(1, sizeof (struct Entry));
@@ -54,6 +41,10 @@ void do_set (char **commands, int commandLen){
 	strcpy(entry->value, value);
 	entry->node.hcode = hash(key);
 	entry->node.next = NULL;
+	entry->expiry=0;
+	if(commandLen==5){
+		entry->expiry=strtol(commands[4],NULL, 10)/1000 + time(NULL);
+	}
 	hm_insert(&g_data.db, &entry->node);
 }
 
@@ -65,8 +56,14 @@ char* do_get(char** commands, int commandLen){
 	key.key = commands[1];
 	struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
 	if(!node)
-		return "nil";
-	return container_of(node, struct Entry, node)->value;
+		return nil;
+	struct Entry * entry = container_of( node, struct Entry,node);
+	//check if expiry is set and is expired
+	if(entry->expiry!=0 && entry->expiry<time(NULL)){
+		delete_entry(entry);
+		return nullBulk;
+	}
+	return entry->value;
 }
 
 void parseMessage(char **commands, int commandLen, int connFd){

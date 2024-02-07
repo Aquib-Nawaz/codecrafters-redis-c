@@ -58,8 +58,15 @@ static void hm_help_resizing(struct HMap *hmap) {
             hmap->resizing_pos++;
             continue;
         }
-
-        h_insert(&hmap->t1,h_detach(&hmap->t2, from));
+        struct HNode *detached_node = h_detach(&hmap->t2, from);
+        struct Entry * entry = container_of( detached_node, struct Entry,node);
+        //check if expiry is set and is expired
+        if(entry->expiry!=0 && entry->expiry<time(NULL)){
+            delete_entry(entry);
+        }
+        else {
+            h_insert(&hmap->t1, detached_node);
+        }
         nwork++;
     }
 
@@ -137,78 +144,68 @@ unsigned long hash( char *str)
     return hash;
 }
 
-int serialize_str(char **writeBuffer, char* str){
-    size_t str_len = strlen(str);
-    *writeBuffer = calloc(str_len+4, sizeof (char ));
-    (*writeBuffer)[0] = '+';
-    strcpy(*writeBuffer+1, str);
-    strcpy(*writeBuffer+1+str_len, "\r\n");
-    return str_len+4;
-}
-
-#if 0
-#define container_of(ptr, type, member) ({                  \
-    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-    (type *)( (char *)__mptr - offsetof(type, member) );})
-
-struct Entry{
-    struct HNode node;
-    char* key;
-    char* value;
-};
-
-static struct {
-    struct HMap db;
-} g_data;
-
-static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
+int entry_eq(struct HNode *lhs, struct HNode *rhs) {
     struct Entry *le = container_of(lhs, struct Entry, node);
     struct Entry *re = container_of(rhs, struct Entry, node);
     return strcmp(le->key, re->key)==0;
 }
 
+void delete_entry(struct Entry* entry){
+    free(entry->value);
+    free(entry->key);
+    free(entry);
+}
+#if 0
+
 void do_set (char **commands, int commandLen){
-    if(commandLen<3)
-        return;
-    struct HNode keyN={
-            .hcode = hash(commands[1])
-    };
-    struct HNode* node = hm_lookup(&g_data.db, &keyN, entry_eq);
-    char* key = commands[1], *value = commands[2];
-    if(node){
-        struct Entry * existing = container_of(node, struct Entry, node);
-        free(existing->value);
-        existing->value = malloc(strlen(value)+1);
-        strcpy(existing->value, value);
-        return;
-    }
-    struct Entry *entry = calloc(1, sizeof (struct Entry));
-    entry->key = malloc(strlen(key)+1);
-    entry->value = malloc(strlen(value)+1);
-    strcpy(entry->key, key);
-    strcpy(entry->value, value);
-    entry->node.hcode = hash(key);
-    hm_insert(&g_data.db, &entry->node);
+	if(commandLen<3)
+		return;
+	struct Entry keyEntry;
+	char* key = commands[1], *value = commands[2];
+	keyEntry.node.hcode = hash(key);
+	keyEntry.key=key;
+	struct HNode* node = hm_lookup(&g_data.db, &keyEntry.node, entry_eq);
+	if(node){
+		struct Entry * existing = container_of(node, struct Entry, node);
+		free(existing->value);
+		existing->value = malloc(strlen(value)+1);
+		strcpy(existing->value, value);
+		return;
+	}
+	struct Entry *entry = calloc(1, sizeof (struct Entry));
+	entry->key = malloc(strlen(key)+1);
+	entry->value = malloc(strlen(value)+1);
+	strcpy(entry->key, key);
+	strcpy(entry->value, value);
+	entry->node.hcode = hash(key);
+	entry->node.next = NULL;
+	hm_insert(&g_data.db, &entry->node);
 }
 
 char* do_get(char** commands, int commandLen){
-    if(commandLen<2)
-        return NULL;
-    struct Entry key;
-    key.node.hcode = hash(commands[1]);
-    key.key = commands[1];
-    struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
-    if(!node)
-        return "nil";
-    return container_of(node, struct Entry, node)->value;
+	if(commandLen<2)
+		return NULL;
+	struct Entry key;
+	key.node.hcode = hash(commands[1]);
+	key.key = commands[1];
+	struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
+	if(!node)
+		return "nil";
+	return container_of(node, struct Entry, node)->value;
 }
+
 
 int main(void){
     char * commands[] = {"set", "randomkey", "randomvalue"};
     do_set(commands, 3);
+    assert(hm_size(&g_data.db)==1);
     char** commands2 = (char* []) {"get", "randomkey"};
     char* ret = do_get(commands2, 2);
     assert(strcmp(commands[2], ret)==0);
+    char** commands3 = (char* []) {"set", "randomkey", "random"};
+    do_set(commands3, 3);
+    assert(hm_size(&g_data.db)==1);
+
 }
 #endif
 

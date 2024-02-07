@@ -11,6 +11,22 @@ void toLower(char * p){
     for ( ; *p; ++p) *p = tolower(*p);
 }
 
+
+int serialize_str(char **writeBuffer, char* str){
+    size_t str_len = strlen(str);
+    if(str == nullBulk){
+        *writeBuffer = calloc(str_len+1, sizeof (char ));
+        strcpy(*writeBuffer, nullBulk);
+        return str_len+1;
+    }
+
+    *writeBuffer = calloc(str_len+4, sizeof (char ));
+    (*writeBuffer)[0] = '+';
+    strcpy(*writeBuffer+1, str);
+    strcpy(*writeBuffer+1+str_len, "\r\n");
+    return str_len+4;
+}
+
 void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
     int newMsg = 0, newKeyword=0, keywordLen=0, keywordNum=-1;
 //    printf("Decoding Message:- %s\n", message);
@@ -36,6 +52,20 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
                     (*commands)[keywordNum] = (char*)malloc(keywordLen+1);
                 }
                 break;
+            case ':':
+                keywordLen=0;
+                if(message[i+1]=='+'||message[i+1]=='-')
+                    keywordLen++;
+                while(isdigit(message[i+keywordLen+1]))
+                    keywordLen++;
+                (*commands)[keywordNum] = malloc(keywordLen+1);
+                printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
+                strncpy((*commands)[keywordNum], message+i+1, keywordLen);
+                (*commands)[keywordNum][keywordLen]='\0';
+                i+=keywordLen;
+                keywordNum++;
+                break;
+
             case '\n':
                 if(newKeyword){
                     printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
@@ -62,7 +92,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
 #if 0
 int main(){
 
-    char *message = "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n";
+    char *message = "*3\r\n$4\r\nECHO\r\n$3\r\nhey\r\n:523";
     int  arrayLen=0;
     char **commands;
     deCodeRedisMessage(message, strlen(message),&commands, &arrayLen);
