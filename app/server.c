@@ -8,7 +8,88 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <ctype.h>
+#include <stddef.h>
 #include "message.h"
+#include "hashset.h"
+
+#define container_of(ptr, type, member) ({                  \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+    (type *)( (char *)__mptr - offsetof(type, member) );})
+
+struct Entry{
+	struct HNode node;
+	char* key;
+	char* value;
+};
+
+static struct {
+	struct HMap db;
+} g_data;
+
+static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
+	struct Entry *le = container_of(lhs, struct Entry, node);
+	struct Entry *re = container_of(rhs, struct Entry, node);
+	return le->key == re->key;
+}
+
+void do_set (char **commands, int commandLen){
+	if(commandLen<3)
+		return;
+	struct Entry entry;
+	char* key = commands[1], *value = commands[2];
+	entry.key = malloc(strlen(key)+1);
+	entry.value = malloc(strlen(value)+1);
+	strcpy(entry.key, key);
+	strcpy(entry.value, value);
+	entry.node.hcode = hash(key);
+	hm_insert(&g_data.db, &entry.node);
+}
+
+char* do_get(char** commands, int commandLen){
+	if(commandLen<2)
+		return NULL;
+	struct HNode key={
+			.hcode = hash(commands[1])
+	};
+	struct HNode* node = hm_lookup(&g_data.db, &key, entry_eq);
+	return container_of(node, struct Entry, node)->value;
+}
+
+void parseMessage(char **commands, int commandLen, int connFd){
+
+    size_t sentBytes;
+	char* writeBuffer;
+    if(commandLen>0){
+        toLower(commands[0]);
+        if(strcmp(ping, commands[0])==0){
+            if( (sentBytes = send(connFd, pingMessage, strlen( pingMessage ), 0))==-1){
+                perror("send\n");
+            }
+        }
+        else if(strcmp(echo, commands[0])==0 && commandLen>1){
+
+			int value_len = serialize_str(&writeBuffer, commands[1]);
+			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
+				perror("send\n");
+			}
+			free(writeBuffer);
+		}
+		else if(strcmp(set, commands[0])==0 && commandLen>=3){
+			do_set(commands, commandLen);
+			if ((sentBytes = send(connFd, ok, strlen(ok), 0)) == -1) {
+				perror("send\n");
+			}
+		}
+		else if(strcmp(get, commands[0])==0 && commandLen>=2){
+			char * ret = do_get(commands, commandLen);
+			int value_len = serialize_str(&writeBuffer, ret);
+			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
+				perror("send\n");
+			}
+			free(writeBuffer);
+		}
+    }
+}
 
 int main() {
 	// Disable output buffering
@@ -53,7 +134,6 @@ int main() {
 	 }
 
 	 printf("Waiting for a client to connect...\n");
-     char* pingMessage = "+PONG\r\n";
 
 	 client_addr_len = sizeof(client_addr);
 
@@ -62,12 +142,9 @@ int main() {
 	 int max_socket_fd = server_fd+1;
      int client_fd;
 	 char buffer[128];
-	 int nbytes, sentBytes;
 	 char ** commands;
 	 int commandLen;
-
-	 char* echo = "echo";
-	 char* ping = "ping";
+	 size_t nbytes;
 
 	 for(;;){
 		 current = master;
@@ -96,30 +173,14 @@ int main() {
 						 else{
 							 perror("receive\n");
 						 }
-						 close(i); // bye!
+						 close(i);
 						 FD_CLR(i, &master);
 						 break;
 					 }
 					 deCodeRedisMessage(buffer, nbytes, &commands, &commandLen);
-					 if(commandLen>0){
-						 toLower(commands[0]);
-						 if(strcmp(ping, commands[0])==0){
-							 if( (sentBytes = send(i, pingMessage, strlen( pingMessage ), 0))==-1){
-								 perror("send\n");
-							 }
-						 }
-						 else if(strcmp(echo, commands[0])==0 && commandLen>1){
-							 int msgLen = strlen(commands[1]);
-							 char* writeBuffer = (char*)malloc(msgLen+3);
-							 *writeBuffer = '+';
-							 strcpy(writeBuffer+1,commands[1]);
-							 writeBuffer[msgLen+1]='\r';
-							 writeBuffer[msgLen+2]='\n';
-							 if( (sentBytes = send(i, writeBuffer, msgLen+3, 0))==-1){
-								 perror("send\n");
-							 }
-						 }
-					 }
+                     parseMessage(commands, commandLen, i);
+					 for(int k=0; k<commandLen; k++){free(commands[i]);}
+					 free(commands);
 				 }
 			 }
 		 }
