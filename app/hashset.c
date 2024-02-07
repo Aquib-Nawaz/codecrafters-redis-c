@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <printf.h>
 
 static void h_init(struct HTab *htab, size_t n) {
     assert(n>0 && (n&(n-1))==0);
