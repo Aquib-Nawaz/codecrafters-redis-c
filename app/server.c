@@ -60,6 +60,7 @@ char* do_get(char** commands, int commandLen){
 	struct Entry * entry = container_of( node, struct Entry,node);
 	//check if expiry is set and is expired
 	if(entry->expiry!=0 && entry->expiry<time(NULL)){
+		hm_pop(&g_data.db, node, entry_eq);
 		delete_entry(entry);
 		return nullBulk;
 	}
