@@ -35,11 +35,11 @@ static int entry_eq(struct HNode *lhs, struct HNode *rhs) {
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
 		return;
-	struct HNode keyN={
-			.hcode = hash(commands[1])
-	};
-	struct HNode* node = hm_lookup(&g_data.db, &keyN, entry_eq);
+	struct Entry keyEntry;
 	char* key = commands[1], *value = commands[2];
+	keyEntry.node.hcode = hash(key);
+	keyEntry.key=key;
+	struct HNode* node = hm_lookup(&g_data.db, &keyEntry.node, entry_eq);
 	if(node){
 		struct Entry * existing = container_of(node, struct Entry, node);
 		free(existing->value);
