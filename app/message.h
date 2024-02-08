@@ -7,7 +7,7 @@
 
 void deCodeRedisMessage(char*, int, char ***, int *);
 void toLower(char*);
-int serialize_str(char **writeBuffer, char* str);
+int serialize_str(char **writeBuffer, char* str, int bulk);
 
 static char* echo = "echo";
 static char* ping = "ping";

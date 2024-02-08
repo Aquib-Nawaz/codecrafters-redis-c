@@ -16,6 +16,16 @@ static struct {
 	struct HMap db;
 } g_data;
 
+void set_expiry(struct timeval* tm, long ms){
+	gettimeofday(tm,NULL);
+	tm->tv_sec += ms/1000;
+	tm->tv_usec += (ms%1000)*1000;
+	if (tm->tv_usec >= 1000000) {
+		tm->tv_usec -= 1000000;
+		tm->tv_sec++;
+	}
+}
+
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
 		return;
@@ -31,9 +41,7 @@ void do_set (char **commands, int commandLen){
 		strcpy(existing->value, value);
 		if(commandLen==5){
 			long ms = strtol(commands[4],NULL, 10);
-			gettimeofday(&existing->expiry,NULL);
-			existing->expiry.tv_sec += ms/1000;
-			existing->expiry.tv_usec += (ms%1000)*1000;
+			set_expiry(&existing->expiry, ms);
 		}
 		return;
 	}
@@ -47,9 +55,7 @@ void do_set (char **commands, int commandLen){
 	entry->expiry.tv_sec=0;
 	if(commandLen==5){
 		long ms = strtol(commands[4],NULL, 10);
-		gettimeofday(&entry->expiry,NULL);
-		entry->expiry.tv_sec += ms/1000;
-		entry->expiry.tv_usec += (ms%1000)*1000;
+		set_expiry(&entry->expiry, ms);
 	}
 	hm_insert(&g_data.db, &entry->node);
 }
@@ -86,7 +92,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
         }
         else if(strcmp(echo, commands[0])==0 && commandLen>1){
 
-			int value_len = serialize_str(&writeBuffer, commands[1]);
+			int value_len = serialize_str(&writeBuffer, commands[1], 0);
 			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
 				perror("send\n");
 			}
@@ -100,7 +106,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		}
 		else if(strcmp(get, commands[0])==0 && commandLen>=2){
 			char * ret = do_get(commands, commandLen);
-			int value_len = serialize_str(&writeBuffer, ret);
+			int value_len = serialize_str(&writeBuffer, ret, 1);
 			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
 				perror("send\n");
 			}
