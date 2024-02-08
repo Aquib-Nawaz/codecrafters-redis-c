@@ -5,6 +5,7 @@
 #include<string.h>
 #include<ctype.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "message.h"
 
 void toLower(char * p){
@@ -97,9 +98,18 @@ int main(){
     char **commands;
     deCodeRedisMessage(message, strlen(message),&commands, &arrayLen);
 
-    printf("Message length: %d\n", arrayLen);
-    for(int i=0; i<arrayLen; i++){
-        printf("KeyWord %d, Size %d:- %s\n", i,strlen(commands[i]), commands[i]);
+//    printf("Message length: %d\n", arrayLen);
+//    for(int i=0; i<arrayLen; i++){
+//        printf("KeyWord %d, Size %d:- %s\n", i,strlen(commands[i]), commands[i]);
+//    }
+    int l= serialize_str(commands, nil);
+    for(int i=0;i<l-1;i++){
+        if(isprint((*commands)[i]))
+            printf("%c ", (*commands)[i]);
+        else
+            printf("%d ", (*commands)[i]);
     }
+    assert(strcmp("+nil\r\n", *commands)==0);
+    free(*commands);
 }
 #endif

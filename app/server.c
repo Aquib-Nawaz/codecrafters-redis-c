@@ -32,7 +32,8 @@ void do_set (char **commands, int commandLen){
 		if(commandLen==5){
 			long ms = strtol(commands[4],NULL, 10);
 			gettimeofday(&existing->expiry,NULL);
-			existing->expiry.tv_sec += ms/1000;  existing->expiry.tv_usec += ms*1000;
+			existing->expiry.tv_sec += ms/1000;
+			existing->expiry.tv_usec += (ms%1000)*1000;
 		}
 		return;
 	}
@@ -47,7 +48,8 @@ void do_set (char **commands, int commandLen){
 	if(commandLen==5){
 		long ms = strtol(commands[4],NULL, 10);
 		gettimeofday(&entry->expiry,NULL);
-		entry->expiry.tv_sec += ms/1000;  entry->expiry.tv_usec += ms*1000;
+		entry->expiry.tv_sec += ms/1000;
+		entry->expiry.tv_usec += (ms%1000)*1000;
 	}
 	hm_insert(&g_data.db, &entry->node);
 }
@@ -66,7 +68,7 @@ char* do_get(char** commands, int commandLen){
 	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
 		hm_pop(&g_data.db, node, entry_eq);
 		delete_entry(entry);
-		return nil;
+		return nullBulk;
 	}
 	return entry->value;
 }
