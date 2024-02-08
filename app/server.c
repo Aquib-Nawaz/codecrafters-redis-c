@@ -16,6 +16,9 @@ static struct {
 	struct HMap db;
 } g_data;
 
+char dir[128]="";
+char dbfilename[128]="";
+
 void set_expiry(struct timeval* tm, long ms){
 	gettimeofday(tm,NULL);
 	tm->tv_sec += ms/1000;
@@ -113,11 +116,44 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			}
 			free(writeBuffer);
 		}
+        else if(strcmp(config, commands[0])==0 && commandLen>=2){
+            toLower(commands[1]);
+            if(strcmp(get, commands[1])==0 && commandLen>=3){
+				toLower(commands[2]);
+                int retStringsLen = 2;
+				char * retStrings[2];
+				if(strcmp(DIR, commands[2])==0){
+                	retStrings[0] = DIR;
+                	retStrings[1] = dir;
+				}
+				else if(strcmp(DBFILENAME, commands[2])==0){
+                	retStrings[0] = DBFILENAME;
+                	retStrings[1] = dbfilename;
+				}
+				int value_len = serialize_strs(&writeBuffer, retStrings, retStringsLen);
+				do {
+					sentBytes = send(connFd, writeBuffer, value_len, 0);
+					value_len -= sentBytes;
+				}while(sentBytes!=-1 && value_len>0);
+				if(sentBytes==-1){
+					perror("send\n");
+				}
+				free(writeBuffer);
+            }
+        }
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	// Disable output buffering
+    for(int cnt=1;cnt<argc-1; cnt+=2){
+        if(strcmp(argv[cnt], "--dir")==0){
+            strcpy(dir, argv[cnt+1]);
+        }
+        else if(strcmp(argv[cnt], "--dbfilename")==0){
+            strcpy(dbfilename, argv[cnt+1]);
+        }
+    }
 	setbuf(stdout, NULL);
 
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -125,7 +161,8 @@ int main() {
 
 	// Uncomment this block to pass the first stage
 
-	 int server_fd, client_addr_len;
+	 int server_fd;
+	 unsigned int client_addr_len;
 	 struct sockaddr_in client_addr;
 
 	 server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -204,7 +241,7 @@ int main() {
 					 }
 					 deCodeRedisMessage(buffer, nbytes, &commands, &commandLen);
                      parseMessage(commands, commandLen, i);
-//					 for(int k=0; k<commandLen; k++){free(commands[i]);}
+					 for(int k=0; k<commandLen; k++){free(commands[k]);}
 					 free(commands);
 				 }
 			 }

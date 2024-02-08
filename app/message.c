@@ -32,6 +32,28 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
     return str_len+3;
 }
 
+int calculate_buffer_len(char ** strs, int size){
+    //*size\r\n$len\r\ndir\r\n
+    int retLength = 0;
+    retLength += snprintf(NULL, 0, "*%d\r\n" ,size);
+    for(int i=0; i<size; i++){
+        retLength += snprintf(NULL, 0, "$%zu\r\n%s\r\n", strlen(strs[i]), strs[i]);
+    }
+    return retLength;
+}
+
+int serialize_strs(char **writeBuffer, char** strs, int size){
+    int writeBufferLen = calculate_buffer_len(strs, size);
+    *writeBuffer = malloc(writeBufferLen+1);
+    int idx=0;
+    idx += snprintf(*writeBuffer, writeBufferLen+1, "*%d\r\n" ,size);
+    for(int i=0; i<size; i++){
+        idx += snprintf(*writeBuffer + idx, writeBufferLen+1-idx,
+                        "$%zu\r\n%s\r\n", strlen(strs[i]), strs[i]);
+    }
+    return idx;
+}
+
 void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
     int newMsg = 0, newKeyword=0, keywordLen=0, keywordNum=-1;
 //    printf("Decoding Message:- %s\n", message);
