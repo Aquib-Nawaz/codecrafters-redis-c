@@ -18,14 +18,14 @@ int serialize_str(char **writeBuffer, char* str){
     if(str == nullBulk){
         *writeBuffer = calloc(str_len+1, sizeof (char ));
         strcpy(*writeBuffer, nullBulk);
-        return str_len+1;
+        return str_len;
     }
 
     *writeBuffer = calloc(str_len+4, sizeof (char ));
     (*writeBuffer)[0] = '+';
     strcpy(*writeBuffer+1, str);
     strcpy(*writeBuffer+1+str_len, "\r\n");
-    return str_len+4;
+    return str_len+3;
 }
 
 void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
