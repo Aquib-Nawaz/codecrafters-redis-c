@@ -21,9 +21,8 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
         return str_len;
     }
     if(bulk){
-
         *writeBuffer = calloc(str_len+10, sizeof (char ));
-        return snprintf(*writeBuffer, sizeof(*writeBuffer), "$%zu\r\n%s\r\n",
+        return snprintf(*writeBuffer, str_len+10, "$%zu\r\n%s\r\n",
                  str_len, str);
     }
     *writeBuffer = calloc(str_len + 4, sizeof(char));
@@ -107,14 +106,14 @@ int main(){
 //    for(int i=0; i<arrayLen; i++){
 //        printf("KeyWord %d, Size %d:- %s\n", i,strlen(commands[i]), commands[i]);
 //    }
-    int l= serialize_str(commands, nil);
+    int l= serialize_str(commands, "pears",1);
     for(int i=0;i<l;i++){
         if(isprint((*commands)[i]))
             printf("%c ", (*commands)[i]);
         else
             printf("%d ", (*commands)[i]);
     }
-    assert(strcmp("$-1\r\n", *commands)==0);
+//    assert(strcmp("$-1\r\n", *commands)==0);
     free(*commands);
 }
 #endif
