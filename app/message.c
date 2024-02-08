@@ -15,9 +15,9 @@ void toLower(char * p){
 
 int serialize_str(char **writeBuffer, char* str){
     size_t str_len = strlen(str);
-    if(str == nullBulk){
+    if(str == nil){
         *writeBuffer = calloc(str_len+1, sizeof (char ));
-        strcpy(*writeBuffer, nullBulk);
+        strcpy(*writeBuffer, str);
         return str_len;
     }
 
