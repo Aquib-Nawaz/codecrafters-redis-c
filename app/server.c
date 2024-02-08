@@ -68,7 +68,7 @@ char* do_get(char** commands, int commandLen){
 	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
 		hm_pop(&g_data.db, node, entry_eq);
 		delete_entry(entry);
-		return nullBulk;
+		return nil;
 	}
 	return entry->value;
 }
