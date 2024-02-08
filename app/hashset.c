@@ -61,7 +61,7 @@ static void hm_help_resizing(struct HMap *hmap) {
         struct HNode *detached_node = h_detach(&hmap->t2, from);
         struct Entry * entry = container_of( detached_node, struct Entry,node);
         //check if expiry is set and is expired
-        if(entry->expiry!=0 && entry->expiry<time(NULL)){
+        if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
             delete_entry(entry);
         }
         else {
@@ -87,6 +87,7 @@ static void hm_start_resizing(struct HMap *hmap) {
 }
 
 struct HNode *hm_lookup(struct HMap *hmap, struct HNode *key, int (*eq)(struct HNode *, struct HNode *)){
+    hm_help_resizing(hmap);
     struct HNode **from = h_lookup(&hmap->t1, key, eq);
     if(from != NULL){
         return *from;
@@ -113,6 +114,7 @@ void hm_insert(struct HMap *hmap, struct HNode *node){
 }
 
 struct HNode *hm_pop(struct HMap *hmap, struct HNode *key, int  (*eq)(struct HNode *, struct HNode *)){
+    hm_help_resizing(hmap);
     struct HNode **from = h_lookup(&hmap->t1,key, eq);
     if(from){
         return h_detach(&hmap->t1, from);
@@ -155,6 +157,13 @@ void delete_entry(struct Entry* entry){
     free(entry->key);
     free(entry);
 }
+
+int check_expired(struct timeval *expiry){
+    struct timeval curr_time;
+    gettimeofday(&curr_time, NULL);
+    return (curr_time.tv_sec>expiry->tv_sec)?1:((curr_time.tv_usec>expiry->tv_usec));
+}
+
 #if 0
 
 void do_set (char **commands, int commandLen){

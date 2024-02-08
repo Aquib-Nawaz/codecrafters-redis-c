@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <time.h>
+#include <sys/time.h>
 
 struct HNode{
     struct HNode* next;
@@ -33,7 +33,7 @@ struct Entry{
     struct HNode node;
     char* key;
     char* value;
-    time_t expiry;
+    struct timeval expiry;
 };
 
 int entry_eq(struct HNode *lhs, struct HNode *rhs);
@@ -45,4 +45,5 @@ void hm_insert(struct HMap *hmap, struct HNode *node);
 struct HNode *hm_pop(struct HMap *hmap, struct HNode *key, int  (*eq)(struct HNode *, struct HNode *));
 size_t hm_size(struct HMap *hmap);
 void hm_destroy(struct HMap *hmap);
+int check_expired(struct timeval *time);
 #endif //REDIS_HASHSET_H

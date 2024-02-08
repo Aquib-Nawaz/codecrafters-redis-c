@@ -30,7 +30,9 @@ void do_set (char **commands, int commandLen){
 		existing->value = malloc(strlen(value)+1);
 		strcpy(existing->value, value);
 		if(commandLen==5){
-			existing->expiry=strtol(commands[4],NULL, 10)/1000 + time(NULL);
+			long ms = strtol(commands[4],NULL, 10);
+			gettimeofday(&existing->expiry,NULL);
+			existing->expiry.tv_sec += ms/1000;  existing->expiry.tv_usec += ms*1000;
 		}
 		return;
 	}
@@ -41,9 +43,11 @@ void do_set (char **commands, int commandLen){
 	strcpy(entry->value, value);
 	entry->node.hcode = hash(key);
 	entry->node.next = NULL;
-	entry->expiry=0;
+	entry->expiry.tv_sec=0;
 	if(commandLen==5){
-		entry->expiry=strtol(commands[4],NULL, 10)/1000 + time(NULL);
+		long ms = strtol(commands[4],NULL, 10);
+		gettimeofday(&entry->expiry,NULL);
+		entry->expiry.tv_sec += ms/1000;  entry->expiry.tv_usec += ms*1000;
 	}
 	hm_insert(&g_data.db, &entry->node);
 }
@@ -59,10 +63,10 @@ char* do_get(char** commands, int commandLen){
 		return nil;
 	struct Entry * entry = container_of( node, struct Entry,node);
 	//check if expiry is set and is expired
-	if(entry->expiry!=0 && entry->expiry<time(NULL)){
+	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
 		hm_pop(&g_data.db, node, entry_eq);
 		delete_entry(entry);
-		return nullBulk;
+		return nil;
 	}
 	return entry->value;
 }
