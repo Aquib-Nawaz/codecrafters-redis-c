@@ -107,7 +107,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else if(strcmp(get, commands[0])==0 && commandLen>=2){
 			char * ret = do_get(commands, commandLen);
 			int value_len = serialize_str(&writeBuffer, ret, 1);
-			printf("Sending %.*s",value_len,writeBuffer);
+//			printf("Sending %.*s",value_len,writeBuffer);
 			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
 				perror("send\n");
 			}
