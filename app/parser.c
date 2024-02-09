@@ -21,43 +21,23 @@ int parseString(FILE *fptr, char **ret){
             break;
         case 1:
             len |= first&((1<<6)-1);
-            len <<= 8;
             fread(&t, sizeof (unsigned char ), 1, fptr);
-            len |= t;
+            len |= t<<8;
             break;
         case 2:
-            for(int i=0; i<3; i++){
-                fread(&t, sizeof (unsigned char ), 1, fptr);
-                len |= t;
-                len <<= 8;
-            }
-            fread(&t, sizeof (unsigned char ), 1, fptr);
-            len |= t;
+            fread(&len, UNSIGNED_INT_SIZE, 1, fptr);
             break;
         case 3:
             isInt = 1;
             switch(first&((1<<6)-1)){
                 case 0:
-//                    fread(&t, sizeof (unsigned char ), 1, fptr);
-//                    val |= t;
+//
                     len=SPECIAL_0;
                     break;
                 case 1:
-//                    fread(&t, sizeof (unsigned char ), 1, fptr);
-//                    val |= t;
-//                    val <<= 8;
-//                    fread(&t, sizeof (unsigned char ), 1, fptr);
-//                    val != t;
                     len=SPECIAL_1;
                     break;
                 case 2:
-//                    for(int i=0; i<3; i++){
-//                        fread(&t, sizeof (unsigned char ), 1, fptr);
-//                        val |= t;
-//                        val <<= 8;
-//                    }
-//                    fread(&t, sizeof (unsigned char ), 1, fptr);
-//                    val |= t;
                     len=SPECIAL_2;
                     break;
                 default:
@@ -111,9 +91,9 @@ void getData(char *** ret, FILE *fptr, int *len){
     unsigned char c;
     unsigned char lengthData[4];
     *len=0;
-    fread(lengthData, 1, 4, fptr);
-    memcpy(len, lengthData+2, 2);
-    *len *= 2;
+    fread(lengthData, 1, 4, fptr); //sel fe
+    memcpy(len, lengthData+2, 1);
+    *len *= 3; //time key value
     printf("Length:- %d\n", *len);
     (*ret) = (char **)calloc(*len, sizeof (char*));
     fread(&c, 1, 1, fptr);
@@ -122,11 +102,31 @@ void getData(char *** ret, FILE *fptr, int *len){
 
     while(c!=(unsigned char)FILE_END){
         printf("New Keyword\n");
-        assert(c==0);
+        int timeType;
         if(c==0){
-            parseString(fptr, &ret[0][arrayIdx++]);
-            parseString(fptr, &ret[0][arrayIdx++]);
+            timeType = 0;
         }
+        else if(c == (unsigned char )EXPIRY_S){
+            timeType = 1;
+        }
+        else if(c == (unsigned char )EXPIRY_MS){
+            timeType = 2;
+        }
+        else{ printf("%x\n", c);exit(1);}
+
+        ret[0][arrayIdx] = calloc(timeType*4+1, 1);
+        *(ret[0][arrayIdx]) =(char)timeType;
+
+        fread(ret[0][arrayIdx]+1,1,timeType*4,fptr);
+        arrayIdx++;
+
+        if(c){
+            fread(&c, 1, 1 ,fptr);
+            assert(c==0); //Only String Type Value Supported
+        }
+
+        parseString(fptr, &ret[0][arrayIdx++]);
+        parseString(fptr, &ret[0][arrayIdx++]);
         fread(&c, 1, 1, fptr);
     }
     fclose(fptr);
@@ -145,9 +145,9 @@ int main(){
     }
     seekData(fptr);
     getData(&data, fptr, &len);
-    assert(len == 4);
-    for(int i=0;i<len-1; i+=2){
-        printf("%s->%s\n", data[i], data[i+1]);
+    assert(len == 6);
+    for(int i=0;i<len-1; i+=3){
+        printf("%s->%s\n", data[i+1], data[i+2]);
     }
 }
 #endif

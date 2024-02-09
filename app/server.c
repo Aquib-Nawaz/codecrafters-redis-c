@@ -175,14 +175,31 @@ void doDbFileStuff(){
     int len;
     char **data;
     getData(&data, fptr, &len);
-    for(int i=0;i<len-1; i+=2){
-        printf("%s->%s\n", data[i], data[i+1]);
+    for(int i=0;i<len-2; i+=3){
+        printf("%s->%s\n", data[i+1], data[i+2]);
         struct Entry *entry = calloc(1, sizeof (struct Entry));
-        entry->key = data[i];
-        entry->value = data[i+1];
+		switch(data[i][0]) {
+			unsigned long t2;
+			unsigned int t1;
+			case 0:
+				entry->expiry.tv_sec = 0;
+				break;
+			case 1:
+				memcpy(&t1, data[i]+1, sizeof t1);
+				entry->expiry.tv_sec = t1;
+				break;
+			case 2:
+				memcpy(&t2, data[i]+1, sizeof t2);
+				entry->expiry.tv_sec = t2/1000;
+				entry->expiry.tv_usec = (t2%1000)*1000;
+				break;
+
+		}
+        entry->key = data[i+1];
+        entry->value = data[i+2];
         entry->node.hcode = hash(data[i]);
         entry->node.next = NULL;
-        entry->expiry.tv_sec=0;
+
         hm_insert(&g_data.db, &entry->node);
     }
 	free(data);
