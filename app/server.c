@@ -161,6 +161,8 @@ void doDbFileStuff(){
 	snprintf(filename, sizeof (filename), "%s/%s", dir, dbfilename);
 
     FILE *fptr;
+	if(nameLength == 0)
+		return;
     if((fptr = fopen(filename, "rb"))==NULL){
 
         perror("fopen: ");
