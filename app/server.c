@@ -183,6 +183,7 @@ void doDbFileStuff(){
         entry->expiry.tv_sec=0;
         hm_insert(&g_data.db, &entry->node);
     }
+	free(data);
 }
 
 int main(int argc, char *argv[]) {

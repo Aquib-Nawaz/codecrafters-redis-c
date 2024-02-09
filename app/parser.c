@@ -81,7 +81,10 @@ int parseString(FILE *fptr, char **ret){
 void seekData(FILE *fptr){
 
     char *ret;
-    fseek(fptr, 9, SEEK_CUR);
+    char redis[6];
+    fread(redis, 1, MAGIC_SIZE, fptr);
+    assert(strcmp(redis, REDIS)==0);
+    fseek(fptr, 4, SEEK_CUR); //version
     unsigned char c;
     fread(&c, 1, 1, fptr);
     while(c==(unsigned char )AUX_FIELD){

@@ -18,7 +18,7 @@
 #define VALUE_TYPE_SIZE 1
 #define FILE_END '\xff'
 
-#define REDIS "REDIS";
+#define REDIS "REDIS"
 
 #define LENGTH_0 0
 #define LENGTH_1 1
