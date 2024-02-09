@@ -29,7 +29,7 @@ void set_expiry(struct timeval* tm, long ms){
 		tm->tv_sec++;
 	}
 }
-
+//TODO Migrate these two functions to I don't know where (utility probably)
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
 		return;
