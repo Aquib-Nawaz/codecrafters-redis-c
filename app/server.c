@@ -197,9 +197,9 @@ void doDbFileStuff(){
 		}
         entry->key = data[i+1];
         entry->value = data[i+2];
-        entry->node.hcode = hash(data[i]);
+        entry->node.hcode = hash(data[i+1]);
         entry->node.next = NULL;
-
+		free(data[i]); //time allocated
         hm_insert(&g_data.db, &entry->node);
     }
 	free(data);
