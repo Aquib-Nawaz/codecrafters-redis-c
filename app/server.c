@@ -30,6 +30,8 @@ void set_expiry(struct timeval* tm, long ms){
 	}
 }
 //TODO Migrate these two functions to I don't know where (utility probably)
+//Cant Migrate to hashset, neither to message
+//Should entry have its own module I think so
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)
 		return;
