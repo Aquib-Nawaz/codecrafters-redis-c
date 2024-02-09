@@ -86,7 +86,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
                 while(isdigit(message[i+keywordLen+1]))
                     keywordLen++;
                 (*commands)[keywordNum] = malloc(keywordLen+1);
-                printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
+//                printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
                 strncpy((*commands)[keywordNum], message+i+1, keywordLen);
                 (*commands)[keywordNum][keywordLen]='\0';
                 i+=keywordLen;
@@ -95,7 +95,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
 
             case '\n':
                 if(newKeyword){
-                    printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
+//                    printf("Copying %.*s from position %d to command pos %d\n", keywordLen,message+i+1, i+1, keywordNum);
                     strncpy((*commands)[keywordNum], message+i+1, keywordLen);
                     (*commands)[keywordNum][keywordLen] = '\0';
                     i+=keywordLen;

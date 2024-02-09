@@ -161,7 +161,11 @@ void delete_entry(struct Entry* entry){
 int check_expired(struct timeval *expiry){
     struct timeval curr_time;
     gettimeofday(&curr_time, NULL);
-    return (curr_time.tv_sec>expiry->tv_sec)?1:((curr_time.tv_usec>expiry->tv_usec));
+    if(curr_time.tv_sec > expiry->tv_sec)
+        return 1;
+    if(curr_time.tv_sec == expiry->tv_sec)
+        return curr_time.tv_usec > expiry->tv_usec;
+    return 0;
 }
 
 int h_scan(char **ret, struct HTab* htab){
@@ -172,7 +176,14 @@ int h_scan(char **ret, struct HTab* htab){
     for(int i=0; i<=htab->mask; i++) {
         struct HNode **from = &htab->tab[i];
         for (struct HNode *cur; (cur = *from) != NULL; from = &cur->next) {
-            ret[idx++] = container_of(*from, struct Entry, node)->key;
+            struct Entry* entry = container_of(*from, struct Entry, node);
+            if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
+                h_detach(htab, from);
+                free(entry);
+            }
+            else{
+                ret[idx++] = entry->key;
+            }
         }
     }
     assert(idx==htab->size);
@@ -184,32 +195,42 @@ int hm_scan(char ***ret, struct HMap *hmap){
     (*ret) = (char **)calloc(size, sizeof (char *));
     int s1 = h_scan(*ret, &hmap->t1);
     s1 += h_scan(*ret+s1, &hmap->t2);
-    assert(s1==size);
-    return size;
+    assert(s1<=size);
+    return s1;
 
 }
 
 
-
-#if 0
-
-static struct {
-    struct HMap db;
-} g_data;
-
-void do_set (char **commands, int commandLen){
+void set_expiry(struct timeval* tm, long ms){
+	gettimeofday(tm,NULL);
+//	printf("Setting Expiry of %li\n", ms);
+	tm->tv_sec += ms/1000;
+	tm->tv_usec += (ms%1000)*1000;
+	if (tm->tv_usec >= 1000000) {
+		tm->tv_usec -= 1000000;
+		tm->tv_sec++;
+	}
+}
+//I have migrated it here
+//Should entry have its own module! I think so
+//I will decouple entry hnode then
+void do_set (char **commands, int commandLen, struct HMap* hmap){
 	if(commandLen<3)
 		return;
 	struct Entry keyEntry;
 	char* key = commands[1], *value = commands[2];
 	keyEntry.node.hcode = hash(key);
 	keyEntry.key=key;
-	struct HNode* node = hm_lookup(&g_data.db, &keyEntry.node, entry_eq);
+	struct HNode* node = hm_lookup(hmap,  &keyEntry.node, entry_eq);
 	if(node){
 		struct Entry * existing = container_of(node, struct Entry, node);
 		free(existing->value);
 		existing->value = malloc(strlen(value)+1);
 		strcpy(existing->value, value);
+		if(commandLen==5){
+			long ms = strtol(commands[4],NULL, 10);
+			set_expiry(&existing->expiry, ms);
+		}
 		return;
 	}
 	struct Entry *entry = calloc(1, sizeof (struct Entry));
@@ -219,31 +240,51 @@ void do_set (char **commands, int commandLen){
 	strcpy(entry->value, value);
 	entry->node.hcode = hash(key);
 	entry->node.next = NULL;
-	hm_insert(&g_data.db, &entry->node);
+	entry->expiry.tv_sec=0;
+	if(commandLen==5){
+		long ms = strtol(commands[4],NULL, 10);
+		set_expiry(&entry->expiry, ms);
+	}
+	hm_insert(hmap, &entry->node);
 }
 
-char* do_get(char** commands, int commandLen){
+char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	if(commandLen<2)
 		return NULL;
 	struct Entry key;
 	key.node.hcode = hash(commands[1]);
 	key.key = commands[1];
-	struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
-	if(!node)
-		return "nil";
-	return container_of(node, struct Entry, node)->value;
+	struct HNode* node = hm_lookup(hmap, &key.node, entry_eq);
+	if(!node){
+//		printf("Node Not found\n");
+		return nil;
+	}
+	struct Entry * entry = container_of( node, struct Entry,node);
+	//check if expiry is set and is expired
+	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
+		hm_pop(hmap, node, entry_eq);
+		delete_entry(entry);
+//		printf("Deleting Node As it is expired\n");
+		return nil;
+	}
+	return entry->value;
 }
 
-
+struct {
+    struct HMap db;
+} g_data;
+#if 0
 int main(void){
-    char * commands[] = {"set", "randomkey", "randomvalue"};
-    do_set(commands, 3);
+
+
+    char * commands[] = {"set", "randomkey", "randomvalue", "px", "10000"};
+    do_set(commands, 5 , &g_data.db);
     assert(hm_size(&g_data.db)==1);
     char** commands2 = (char* []) {"get", "randomkey"};
-    char* ret = do_get(commands2, 2);
+    char* ret = do_get(commands2, 2, &g_data.db);
     assert(strcmp(commands[2], ret)==0);
     char** commands3 = (char* []) {"set", "randomkey", "random"};
-    do_set(commands3, 3);
+    do_set(commands3, 3, &g_data.db);
     assert(hm_size(&g_data.db)==1);
 
 }

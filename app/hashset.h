@@ -29,12 +29,18 @@ struct HMap{
     const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
     (type *)( (char *)__mptr - offsetof(type, member) );})
 
+#define nil "$-1\r\n"
+
 struct Entry{
     struct HNode node;
     char* key;
     char* value;
     struct timeval expiry;
 };
+
+void set_expiry(struct timeval* tm, long ms);
+void do_set (char **commands, int commandLen, struct HMap* hmap);
+char* do_get(char** commands, int commandLen, struct HMap* hmap);
 
 int entry_eq(struct HNode *lhs, struct HNode *rhs);
 void delete_entry(struct Entry* entry);

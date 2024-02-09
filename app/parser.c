@@ -94,14 +94,14 @@ void getData(char *** ret, FILE *fptr, int *len){
     fread(lengthData, 1, 4, fptr); //sel fe
     memcpy(len, lengthData+2, 1);
     *len *= 3; //time key value
-    printf("Length:- %d\n", *len);
+//    printf("Length:- %d\n", *len);
     (*ret) = (char **)calloc(*len, sizeof (char*));
     fread(&c, 1, 1, fptr);
 
     int arrayIdx = 0;
 
     while(c!=(unsigned char)FILE_END){
-        printf("New Keyword\n");
+//        printf("New Keyword\n");
         int timeType;
         if(c==0){
             timeType = 0;

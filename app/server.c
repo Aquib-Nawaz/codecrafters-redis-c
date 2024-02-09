@@ -20,71 +20,6 @@ static struct {
 char dir[128]="";
 char dbfilename[128]="";
 
-void set_expiry(struct timeval* tm, long ms){
-	gettimeofday(tm,NULL);
-	tm->tv_sec += ms/1000;
-	tm->tv_usec += (ms%1000)*1000;
-	if (tm->tv_usec >= 1000000) {
-		tm->tv_usec -= 1000000;
-		tm->tv_sec++;
-	}
-}
-//TODO Migrate these two functions to I don't know where (utility probably)
-//Cant Migrate to hashset, neither to message
-//Should entry have its own module I think so
-void do_set (char **commands, int commandLen){
-	if(commandLen<3)
-		return;
-	struct Entry keyEntry;
-	char* key = commands[1], *value = commands[2];
-	keyEntry.node.hcode = hash(key);
-	keyEntry.key=key;
-	struct HNode* node = hm_lookup(&g_data.db, &keyEntry.node, entry_eq);
-	if(node){
-		struct Entry * existing = container_of(node, struct Entry, node);
-		free(existing->value);
-		existing->value = malloc(strlen(value)+1);
-		strcpy(existing->value, value);
-		if(commandLen==5){
-			long ms = strtol(commands[4],NULL, 10);
-			set_expiry(&existing->expiry, ms);
-		}
-		return;
-	}
-	struct Entry *entry = calloc(1, sizeof (struct Entry));
-	entry->key = malloc(strlen(key)+1);
-	entry->value = malloc(strlen(value)+1);
-	strcpy(entry->key, key);
-	strcpy(entry->value, value);
-	entry->node.hcode = hash(key);
-	entry->node.next = NULL;
-	entry->expiry.tv_sec=0;
-	if(commandLen==5){
-		long ms = strtol(commands[4],NULL, 10);
-		set_expiry(&entry->expiry, ms);
-	}
-	hm_insert(&g_data.db, &entry->node);
-}
-
-char* do_get(char** commands, int commandLen){
-	if(commandLen<2)
-		return NULL;
-	struct Entry key;
-	key.node.hcode = hash(commands[1]);
-	key.key = commands[1];
-	struct HNode* node = hm_lookup(&g_data.db, &key.node, entry_eq);
-	if(!node)
-		return nil;
-	struct Entry * entry = container_of( node, struct Entry,node);
-	//check if expiry is set and is expired
-	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
-		hm_pop(&g_data.db, node, entry_eq);
-		delete_entry(entry);
-		return nil;
-	}
-	return entry->value;
-}
-
 void parseMessage(char **commands, int commandLen, int connFd){
 
     size_t sentBytes;
@@ -105,13 +40,13 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			free(writeBuffer);
 		}
 		else if(strcmp(set, commands[0])==0 && commandLen>=3){
-			do_set(commands, commandLen);
+			do_set(commands, commandLen,&g_data.db );
 			if ((sentBytes = send(connFd, ok, strlen(ok), 0)) == -1) {
 				perror("send\n");
 			}
 		}
 		else if(strcmp(get, commands[0])==0 && commandLen>=2){
-			char * ret = do_get(commands, commandLen);
+			char * ret = do_get(commands, commandLen, &g_data.db);
 			int value_len = serialize_str(&writeBuffer, ret, 1);
 //			printf("Sending %.*s",value_len,writeBuffer);
 			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
@@ -192,6 +127,8 @@ void doDbFileStuff(){
 				memcpy(&t2, data[i]+1, sizeof t2);
 				entry->expiry.tv_sec = t2/1000;
 				entry->expiry.tv_usec = (t2%1000)*1000;
+				time_t ti= time(NULL);
+				printf("%li\n", ti-entry->expiry.tv_sec);
 				break;
 
 		}
