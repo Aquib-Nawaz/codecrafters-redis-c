@@ -46,4 +46,5 @@ struct HNode *hm_pop(struct HMap *hmap, struct HNode *key, int  (*eq)(struct HNo
 size_t hm_size(struct HMap *hmap);
 void hm_destroy(struct HMap *hmap);
 int check_expired(struct timeval *time);
+int hm_scan(char ***, struct HMap *);
 #endif //REDIS_HASHSET_H

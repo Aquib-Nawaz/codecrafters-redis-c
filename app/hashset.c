@@ -164,7 +164,38 @@ int check_expired(struct timeval *expiry){
     return (curr_time.tv_sec>expiry->tv_sec)?1:((curr_time.tv_usec>expiry->tv_usec));
 }
 
+int h_scan(char **ret, struct HTab* htab){
+    if(htab->size==0 || htab->tab==NULL)
+        return 0;
+    int idx=0;
+
+    for(int i=0; i<=htab->mask; i++) {
+        struct HNode **from = &htab->tab[i];
+        for (struct HNode *cur; (cur = *from) != NULL; from = &cur->next) {
+            ret[idx++] = container_of(*from, struct Entry, node)->key;
+        }
+    }
+    assert(idx==htab->size);
+    return idx;
+}
+
+int hm_scan(char ***ret, struct HMap *hmap){
+    int size = hm_size(hmap);
+    (*ret) = (char **)calloc(size, sizeof (char *));
+    int s1 = h_scan(*ret, &hmap->t1);
+    s1 += h_scan(*ret+s1, &hmap->t2);
+    assert(s1==size);
+    return size;
+
+}
+
+
+
 #if 0
+
+static struct {
+    struct HMap db;
+} g_data;
 
 void do_set (char **commands, int commandLen){
 	if(commandLen<3)

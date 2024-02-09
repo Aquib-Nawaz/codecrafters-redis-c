@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include "message.h"
 #include "hashset.h"
+#include "parser.h"
 
 static struct {
 	struct HMap db;
@@ -141,6 +142,44 @@ void parseMessage(char **commands, int commandLen, int connFd){
 				free(writeBuffer);
             }
         }
+
+        else if(strcmp(keys, commands[0])==0 && commandLen>=2){
+			char **ret;
+			int retLen = hm_scan(&ret, &g_data.db);
+            int value_len = serialize_strs(&writeBuffer, ret, retLen);
+            do {
+                sentBytes = send(connFd, writeBuffer, value_len, 0);
+                value_len -= sentBytes;
+            }while(sentBytes!=-1 && value_len>0);
+        }
+    }
+}
+
+void doDbFileStuff(){
+    int nameLength = strlen(dir) +  strlen(dbfilename);
+	char filename[nameLength+2];
+	snprintf(filename, sizeof (filename), "%s/%s", dir, dbfilename);
+
+    FILE *fptr;
+    if((fptr = fopen(filename, "rb"))==NULL){
+
+        perror("fopen: ");
+        return;
+//        exit(1);
+    }
+    seekData(fptr);
+    int len;
+    char **data;
+    getData(&data, fptr, &len);
+    for(int i=0;i<len-1; i+=2){
+        printf("%s->%s\n", data[i], data[i+1]);
+        struct Entry *entry = calloc(1, sizeof (struct Entry));
+        entry->key = data[i];
+        entry->value = data[i+1];
+        entry->node.hcode = hash(data[i]);
+        entry->node.next = NULL;
+        entry->expiry.tv_sec=0;
+        hm_insert(&g_data.db, &entry->node);
     }
 }
 
@@ -155,6 +194,7 @@ int main(int argc, char *argv[]) {
         }
     }
 	setbuf(stdout, NULL);
+    doDbFileStuff();
 
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	printf("Logs from your program will appear here!\n");
