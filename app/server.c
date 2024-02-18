@@ -144,12 +144,16 @@ void doDbFileStuff(){
 
 int main(int argc, char *argv[]) {
 	// Disable output buffering
+    int port=6379;
     for(int cnt=1;cnt<argc-1; cnt+=2){
         if(strcmp(argv[cnt], "--dir")==0){
             strcpy(dir, argv[cnt+1]);
         }
         else if(strcmp(argv[cnt], "--dbfilename")==0){
             strcpy(dbfilename, argv[cnt+1]);
+        }
+        else if(strcmp(argv[cnt], "--port")==0){
+            port = atoi(argv[cnt+1]);
         }
     }
 	setbuf(stdout, NULL);
@@ -179,7 +183,7 @@ int main(int argc, char *argv[]) {
 	 }
 
 	 struct sockaddr_in serv_addr = { .sin_family = AF_INET ,
-	 								 .sin_port = htons(6379),
+	 								 .sin_port = htons(port),
 	 								 .sin_addr = { htonl(INADDR_ANY) },
 	 								};
 
