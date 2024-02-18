@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
         }
         else if(strcmp(argv[cnt], "--port")==0){
             port = atoi(argv[cnt+1]);
-			printf("port-- %d", port)
+			printf("port-- %d", port);
         }
 		else if(strcmp(argv[cnt], "--replicaof")==0){
 //            port = atoi(argv[cnt+2]);
