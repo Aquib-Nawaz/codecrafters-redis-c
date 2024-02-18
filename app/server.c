@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
             port = atoi(argv[cnt+1]);
         }
 		else if(strcmp(argv[cnt], "--replicaof")==0){
-//            port = atoi(argv[cnt+1]);
+            port = atoi(argv[cnt+2]);
 			replicaOf=1;
 			cnt++;
         }
