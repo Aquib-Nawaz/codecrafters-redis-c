@@ -89,6 +89,11 @@ void parseMessage(char **commands, int commandLen, int connFd){
                 value_len -= sentBytes;
             }while(sentBytes!=-1 && value_len>0);
         }
+
+		else if(strcmp(commands[0],"info")==0){
+			send(connFd, "$11\r\nrole:master\r\n",18, 0 );
+		}
+
     }
 }
 
