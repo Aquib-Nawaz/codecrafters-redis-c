@@ -84,7 +84,7 @@ void doReplicaStuff(char* master_host, char* master_port, int my_port){
     free(write_buffer);
     freeaddrinfo(servinfo); // all done with this structure
 
-    char read_buffer[100];
+    char read_buffer[200];
     ssize_t nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
     if(nbytes<=0)
         return;
@@ -108,6 +108,9 @@ void doReplicaStuff(char* master_host, char* master_port, int my_port){
         return;
     assert(strncmp(read_buffer, ok, nbytes)==0);
     close(master_fd);
+    send_helper(master_fd, HANDSHAKE_MESSAGE_3, strlen(HANDSHAKE_MESSAGE_3));
+    nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    assert(nbytes<sizeof read_buffer);
 
 }
 #endif

@@ -14,6 +14,7 @@
 #define REPLCONF "REPLCONF"
 #define LISTENING_PORT "listening-port"
 #define REPLCONF_MESSAGE_2 "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n"
+#define HANDSHAKE_MESSAGE_3 "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n"
 
 void info_command(int);
 void doReplicaStuff(char*,char*,int);
