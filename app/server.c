@@ -82,7 +82,6 @@ void parseMessage(char **commands, int commandLen, int connFd){
 				free(writeBuffer);
             }
         }
-
         else if(strcmp(KEYS, commands[0])==0 && commandLen>=2){
 			char **ret;
 			int retLen = hm_scan(&ret, &g_data.db);
@@ -92,9 +91,11 @@ void parseMessage(char **commands, int commandLen, int connFd){
                 value_len -= sentBytes;
             }while(sentBytes!=-1 && value_len>0);
         }
-
 		else if(strcmp(commands[0],INFO)==0){
 			info_command(connFd);
+		}
+		else if(strcmp(commands[0], "replconf")==0){
+			send(connFd, ok, strlen(ok), 0);
 		}
 
     }
