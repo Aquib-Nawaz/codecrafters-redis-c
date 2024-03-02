@@ -21,7 +21,6 @@ static struct {
 
 char dir[128]="";
 char dbfilename[128]="";
-extern int replica_of;
 
 void parseMessage(char **commands, int commandLen, int connFd){
 
@@ -152,7 +151,9 @@ void doDbFileStuff(){
 }
 
 int main(int argc, char *argv[]) {
-	// Disable output buffering
+	int replica_of=0;
+	char* master_port;
+	char* master_host;
     int port=6379;
     for(int cnt=1;cnt<argc-1; cnt+=2){
         if(strcmp(argv[cnt], "--dir")==0){
@@ -165,13 +166,17 @@ int main(int argc, char *argv[]) {
             port = atoi(argv[cnt+1]);
         }
 		else if(strcmp(argv[cnt], "--replicaof")==0){
-//            port = atoi(argv[cnt+2]);
+
+			master_port = argv[cnt+2];
+			master_host = argv[cnt+1];
 			replica_of=1;
 			cnt++;
         }
     }
 	setbuf(stdout, NULL);
     doDbFileStuff();
+	if(replica_of)
+    	doReplicaStuff(master_host, master_port);
 
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	printf("Logs from your program will appear here!\n");
@@ -192,7 +197,7 @@ int main(int argc, char *argv[]) {
 	 // ensures that we don't run into 'Address already in use' errors
 	 int reuse = 1;
 	 if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
-	 	printf("SO_REUSEPORT failed: %s \n", strerror(errno));
+	 	printf("SO_REUSEADDR failed: %s \n", strerror(errno));
 	 	return 1;
 	 }
 

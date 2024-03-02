@@ -13,4 +13,6 @@
 #define MASTER_REPL_OFFSET "master_repl_offset"
 
 void info_command(int);
+void doReplicaStuff(char*,char*);
+
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H
