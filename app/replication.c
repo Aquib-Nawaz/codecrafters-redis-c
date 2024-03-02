@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <assert.h>
 
 #if 1
 int replica_of=0;
@@ -33,10 +34,9 @@ void info_command(int connFd){
     free(writeBuffer);
 }
 
-void doReplicaStuff(char* master_host, char* master_port){
+void doReplicaStuff(char* master_host, char* master_port, int my_port){
     replica_of=1;
     int master_fd;
-    struct sockaddr_in master_addr;
     struct addrinfo hints;
     struct addrinfo *servinfo, *p;  // will point to the results
 
@@ -84,7 +84,31 @@ void doReplicaStuff(char* master_host, char* master_port){
     free(write_buffer);
     freeaddrinfo(servinfo); // all done with this structure
 
+    char read_buffer[100];
+    ssize_t nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    if(nbytes<=0)
+        return;
+    assert(strncmp(read_buffer, pingMessage, nbytes)==0);
+    msg = malloc(3*sizeof (char*));
+    msg[0]=REPLCONF;
+    msg[1]=LISTENING_PORT;
+    msg[2]=malloc(10);
+    sprintf(msg[2], "%d", my_port);
+    value_len = serialize_strs(&write_buffer, msg, 3);
+    send_helper(master_fd, write_buffer, value_len);
+    free(write_buffer);
+    free(msg);
+    nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    if(nbytes<=0)
+        return;
+    assert(strncmp(read_buffer, ok, nbytes)==0);
+    send_helper(master_fd, REPLCONF_MESSAGE_2, strlen(REPLCONF_MESSAGE_2));
+    nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    if(nbytes<=0)
+        return;
+    assert(strncmp(read_buffer, ok, nbytes)==0);
     close(master_fd);
+
 }
 #endif
 #if 0

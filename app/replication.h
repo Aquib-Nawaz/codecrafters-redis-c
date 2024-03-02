@@ -11,8 +11,11 @@
 #define ROLE "role"
 #define MASTER_REPL_ID "master_replid"
 #define MASTER_REPL_OFFSET "master_repl_offset"
+#define REPLCONF "REPLCONF"
+#define LISTENING_PORT "listening-port"
+#define REPLCONF_MESSAGE_2 "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n"
 
 void info_command(int);
-void doReplicaStuff(char*,char*);
+void doReplicaStuff(char*,char*,int);
 
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H

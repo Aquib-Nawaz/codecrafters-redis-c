@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
 	setbuf(stdout, NULL);
     doDbFileStuff();
 	if(replica_of)
-    	doReplicaStuff(master_host, master_port);
+    	doReplicaStuff(master_host, master_port, port);
 
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	printf("Logs from your program will appear here!\n");
