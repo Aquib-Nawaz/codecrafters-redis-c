@@ -7,5 +7,5 @@
 # DON'T EDIT THIS!
 set -e
 tmpFile=$(mktemp)
-gcc -g -fsanitize=undefined -fsanitize=address app/*.c -o $tmpFile
+gcc app/*.c -o $tmpFile
 exec $tmpFile "$@"

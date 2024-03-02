@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <unistd.h>
+#include <stdio.h>
 
 static void h_init(struct HTab *htab, size_t n) {
     assert(n>0 && (n&(n-1))==0);
@@ -151,7 +153,6 @@ int entry_eq(struct HNode *lhs, struct HNode *rhs) {
     struct Entry *re = container_of(rhs, struct Entry, node);
     return strcmp(le->key, re->key)==0;
 }
-
 void delete_entry(struct Entry* entry){
     free(entry->value);
     free(entry->key);
@@ -278,12 +279,13 @@ struct {
 int main(void){
 
 
-    char * commands[] = {"set", "randomkey", "randomvalue", "px", "10000"};
+    char * commands[] = {"set", "randomkey", "randomvalue", "px", "1000"};
     do_set(commands, 5 , &g_data.db);
     assert(hm_size(&g_data.db)==1);
+    sleep(1);
     char** commands2 = (char* []) {"get", "randomkey"};
     char* ret = do_get(commands2, 2, &g_data.db);
-    assert(strcmp(commands[2], ret)==0);
+    assert(strcmp(nil, ret)==0);
     char** commands3 = (char* []) {"set", "randomkey", "random"};
     do_set(commands3, 3, &g_data.db);
     assert(hm_size(&g_data.db)==1);

@@ -199,6 +199,12 @@ int main(int argc, char *argv[]) {
 	 	return 1;
 	 }
 
+	reuse = 1;
+	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+		printf("SO_REUSEPORT failed: %s \n", strerror(errno));
+		return 1;
+	}
+
 	 struct sockaddr_in serv_addr = { .sin_family = AF_INET ,
 	 								 .sin_port = htons(port),
 	 								 .sin_addr = { htonl(INADDR_ANY) },
