@@ -6,5 +6,6 @@ add_executable(codecrafters_redis_c
         app/server.c
         app/hashset.c
         app/parser.c
-        app/message.c)
+        app/message.c
+        app/replication.c)
 

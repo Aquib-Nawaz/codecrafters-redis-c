@@ -13,14 +13,15 @@
 #include "message.h"
 #include "hashset.h"
 #include "parser.h"
+#include "replication.h"
 
 static struct {
 	struct HMap db;
 } g_data;
 
-int replicaOf=-1;
 char dir[128]="";
 char dbfilename[128]="";
+extern int replica_of;
 
 void parseMessage(char **commands, int commandLen, int connFd){
 
@@ -94,11 +95,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
         }
 
 		else if(strcmp(commands[0],INFO)==0){
-			if(replicaOf==-1)
-				send(connFd, "$11\r\nrole:master\r\n",18, 0 );
-			else
-				send(connFd, "$10\r\nrole:slave\r\n",17, 0 );
-
+			info_command(connFd);
 		}
 
     }
@@ -169,7 +166,7 @@ int main(int argc, char *argv[]) {
         }
 		else if(strcmp(argv[cnt], "--replicaof")==0){
 //            port = atoi(argv[cnt+2]);
-			replicaOf=1;
+			replica_of=1;
 			cnt++;
         }
     }

@@ -282,9 +282,11 @@ int main(void){
     char * commands[] = {"set", "randomkey", "randomvalue", "px", "1000"};
     do_set(commands, 5 , &g_data.db);
     assert(hm_size(&g_data.db)==1);
-    sleep(1);
     char** commands2 = (char* []) {"get", "randomkey"};
     char* ret = do_get(commands2, 2, &g_data.db);
+    assert(strcmp(ret, commands[2])==0);
+    sleep(1);
+    ret = do_get(commands2, 2, &g_data.db);
     assert(strcmp(nil, ret)==0);
     char** commands3 = (char* []) {"set", "randomkey", "random"};
     do_set(commands3, 3, &g_data.db);

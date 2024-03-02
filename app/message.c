@@ -21,8 +21,9 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
         return str_len;
     }
     if(bulk){
-        *writeBuffer = calloc(str_len+10, sizeof (char ));
-        return snprintf(*writeBuffer, str_len+10, "$%zu\r\n%s\r\n",
+        int ret_len = snprintf(NULL, 0, "$%zu\r\n%s\r\n", str_len, str);
+        *writeBuffer = calloc(ret_len+1, sizeof (char ));
+        return snprintf(*writeBuffer, ret_len+1, "$%zu\r\n%s\r\n",
                  str_len, str);
     }
     *writeBuffer = calloc(str_len + 4, sizeof(char));
