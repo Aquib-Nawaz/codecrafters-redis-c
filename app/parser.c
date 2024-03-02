@@ -64,24 +64,13 @@ void seekData(FILE *fptr){
     char redis[6];
     fread(redis, 1, MAGIC_SIZE, fptr);
     assert(strcmp(redis, REDIS)==0);
-    fseek(fptr, 4, SEEK_CUR); //version
+    fseek(fptr, VERSION_SIZE, SEEK_CUR); //version
     unsigned char c;
     fread(&c, 1, 1, fptr);
     while(c==(unsigned char )AUX_FIELD){
         parseString(fptr, NULL);
         parseString(fptr, NULL);
-//        printf("%s->", ret);
-//        free(ret);
-//        if(parseString(fptr, &ret)){
-//            long i;
-//            memcpy(&i, ret, strlen(ret));
-//            printf("%li", i);
-//        }
-//        else{
-//            printf("%s ", ret);
-//        }
-//        printf("\n");
-//        free(ret);
+
         fread(&c, 1, 1, fptr);
     }
     assert(c==(unsigned char )DB_SELECTOR);
@@ -96,7 +85,7 @@ void getData(char *** ret, FILE *fptr, int *len){
     *len *= 3; //time key value
 //    printf("Length:- %d\n", *len);
     (*ret) = (char **)calloc(*len, sizeof (char*));
-    fread(&c, 1, 1, fptr);
+    fread(&c, VALUE_TYPE_SIZE, 1, fptr);
 
     int arrayIdx = 0;
 
@@ -121,7 +110,7 @@ void getData(char *** ret, FILE *fptr, int *len){
         arrayIdx++;
 
         if(c){
-            fread(&c, 1, 1 ,fptr);
+            fread(&c, VALUE_TYPE_SIZE, 1 ,fptr);
             assert(c==0); //Only String Type Value Supported
         }
 

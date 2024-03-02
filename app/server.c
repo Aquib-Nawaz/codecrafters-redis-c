@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <ctype.h>
+#include <time.h>
 #include <stddef.h>
 #include "message.h"
 #include "hashset.h"
@@ -32,7 +33,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
                 perror("send\n");
             }
         }
-        else if(strcmp(echo, commands[0])==0 && commandLen>1){
+        else if(strcmp(ECHO, commands[0])==0 && commandLen>1){
 
 			int value_len = serialize_str(&writeBuffer, commands[1], 0);
 			if ((sentBytes = send(connFd, writeBuffer, value_len, 0)) == -1) {
@@ -46,6 +47,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
 				perror("send\n");
 			}
 		}
+        //check if command matches with get
 		else if(strcmp(get, commands[0])==0 && commandLen>=2){
 			char * ret = do_get(commands, commandLen, &g_data.db);
 			int value_len = serialize_str(&writeBuffer, ret, 1);
@@ -81,7 +83,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
             }
         }
 
-        else if(strcmp(keys, commands[0])==0 && commandLen>=2){
+        else if(strcmp(KEYS, commands[0])==0 && commandLen>=2){
 			char **ret;
 			int retLen = hm_scan(&ret, &g_data.db);
             int value_len = serialize_strs(&writeBuffer, ret, retLen);
@@ -91,7 +93,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
             }while(sentBytes!=-1 && value_len>0);
         }
 
-		else if(strcmp(commands[0],"info")==0){
+		else if(strcmp(commands[0],INFO)==0){
 			if(replicaOf==-1)
 				send(connFd, "$11\r\nrole:master\r\n",18, 0 );
 			else
@@ -164,7 +166,6 @@ int main(int argc, char *argv[]) {
         }
         else if(strcmp(argv[cnt], "--port")==0){
             port = atoi(argv[cnt+1]);
-			printf("port-- %d", port);
         }
 		else if(strcmp(argv[cnt], "--replicaof")==0){
 //            port = atoi(argv[cnt+2]);

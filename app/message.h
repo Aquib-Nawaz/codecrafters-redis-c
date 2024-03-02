@@ -11,11 +11,12 @@ int serialize_str(char **writeBuffer, char* str, int bulk);
 int serialize_strs(char **writeBuffer, char** strs,int size);
 int calculate_buffer_len(char **, int);
 
-#define keys "keys"
-static char* echo = "echo";
-static char* ping = "ping";
-static char* pingMessage = "+PONG\r\n";
-static char* get = "get";
+#define KEYS "keys"
+#define INFO "info"
+#define ECHO "echo"
+#define ping "ping"
+#define pingMessage "+PONG\r\n"
+#define get "get"
 static char* set = "set";
 static char* ok = "+OK\r\n";
 static char* nil = "$-1\r\n";

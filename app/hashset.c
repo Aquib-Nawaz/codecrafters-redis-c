@@ -270,10 +270,11 @@ char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	return entry->value;
 }
 
+
+#if 0
 struct {
     struct HMap db;
 } g_data;
-#if 0
 int main(void){
 
 
