@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <stddef.h>
+#include <pthread.h>
 #include "message.h"
 #include "hashset.h"
 #include "parser.h"
@@ -26,7 +27,7 @@ extern int master_offset;
 
 void parseMessage(char **commands, int commandLen, int connFd){
 
-    size_t sentBytes;
+    ssize_t sentBytes;
 	char* writeBuffer;
     if(commandLen>0){
         toLower(commands[0]);
@@ -107,7 +108,16 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			psync_command(connFd);
 		}
 		else  if(strcmp(commands[0], WAIT)==0){
-			wait_command(connFd);
+			if(commandLen==3){
+				send_ack_request();
+				struct WaitThreadArgs args;
+				args.connFd = connFd;
+				args.expected_replica = (int)strtol(commands[1], NULL, 10);
+				args.waitTime = strtol(commands[2], NULL, 10);
+				pthread_t thread;
+				pthread_create(&thread, NULL, wait_command, &args);
+				wait_command(&args);
+			}
 		}
     }
 }
@@ -248,7 +258,7 @@ int main(int argc, char *argv[]) {
 	 char buffer[1024];
 	 char ** commands;
 	 int commandLen;
-	 size_t nbytes;
+	 ssize_t nbytes;
 
 	 for(;;){
 		 current = master;
@@ -280,6 +290,8 @@ int main(int argc, char *argv[]) {
 
 						 close(i);
 						 FD_CLR(i, &master);
+						 if(master_fd==i)
+							 master_fd=-1;
 						 break;
 					 }
 					 int parsed_len=0, cur_parsed;
@@ -294,6 +306,11 @@ int main(int argc, char *argv[]) {
 //							printf("Received command %s from master increasing offset by %d\n", commands[0], cur_parsed);
 							 master_offset+=cur_parsed;
 						 }
+
+						 //handshake complete don't listen to this guy anymore
+						 if(commandLen>0&&strcmp(commands[0], psync)==0)
+							 FD_CLR(i, &master);
+
 						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }
 						 if(commands)
 							 free(commands);

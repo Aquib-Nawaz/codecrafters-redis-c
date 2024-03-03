@@ -20,12 +20,20 @@
 #define GETACK_REPLY "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$%d\r\n%d\r\n"
 #define GET_ACK "getack"
 #define WAIT_RESPONSE ":%d\r\n"
+#define GET_ACK_COMMAND "*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n"
 
+struct WaitThreadArgs{
+    int connFd;
+    int expected_replica;
+    long waitTime;
+};
+
+void send_ack_request();
 void info_command(int);
 int doReplicaStuff(char*,char*,int);
 void psync_command(int);
 void replconf_command(int , char **, int);
 void send_to_replicas(char **, int );
-void wait_command(int);
+void* wait_command(void*);
 
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H

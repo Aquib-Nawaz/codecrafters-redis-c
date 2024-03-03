@@ -9,6 +9,9 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <assert.h>
+#include <pthread.h>
+#include <time.h>
+#include <sys/time.h>
 
 #if 1
 int replica_of=0;
@@ -16,6 +19,10 @@ int  replicas_fd[MAX_REPLICAS];
 int num_replicas=0;
 int master_fd=-1;
 int master_offset=0;
+int replicas_acknowledged=0;
+pthread_t replica_thread[MAX_REPLICAS];
+pthread_mutex_t ack_mutex = PTHREAD_MUTEX_INITIALIZER;
+int replicas_offset[MAX_REPLICAS]={0};
 
 void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
@@ -29,6 +36,41 @@ void send_helper(int connFd, char* writeBuffer,int value_len){
     }
 }
 
+void* handle_replica_ack(void *args){
+    int thread_num = *((int*)args);
+    int connFd = replicas_fd[thread_num];
+    assert(connFd>0);
+    char read_buffer[100];
+    ssize_t nbytes;
+    do {
+        nbytes=recv(connFd, read_buffer, sizeof read_buffer, 0);
+        fflush(stdout);
+        if(nbytes>0){
+            int i=(int)nbytes-3;
+            int replica_offset=0, pow=1;
+            while(read_buffer[i]<='9'&&read_buffer[i]>='0'){
+                replica_offset+=(read_buffer[i--]-'0')*pow;
+                pow*=10;
+            }
+
+            printf("Given offset %d, Expected offset %d\n",replica_offset,
+                   replicas_offset[thread_num]);
+
+            if(replica_offset>=replicas_offset[thread_num]- strlen(GET_ACK_COMMAND)){
+                pthread_mutex_lock(&ack_mutex);
+                replicas_acknowledged++;
+                pthread_mutex_unlock(&ack_mutex);
+                printf("Received Acknowledgement\n");
+                fflush(stdout);
+            }
+        }
+    }while(nbytes!=-1);
+    printf("Can't Receive Ack anymore\n");
+    fflush(stdout);
+    return NULL;
+
+}
+
 void replconf_command(int connFd, char** commands, int commandLen){
     if(commandLen!=3)
         return;
@@ -36,7 +78,10 @@ void replconf_command(int connFd, char** commands, int commandLen){
     if(strcmp(commands[1], LISTENING_PORT)==0){
         if(num_replicas==MAX_REPLICAS)
             return;
-        replicas_fd[num_replicas++] = connFd;
+        replicas_fd[num_replicas] = connFd;
+        pthread_mutex_lock(&ack_mutex);
+        replicas_acknowledged++;
+        pthread_mutex_unlock(&ack_mutex);
     }
 
     else if(strcmp(commands[1], GET_ACK)==0){
@@ -86,13 +131,35 @@ void psync_command(int connFd){
     send_helper(connFd, writeBuffer, value_len);
     free(writeBuffer);
     fclose(fptr);
+    int *cur_thread_num=malloc(sizeof (int));
+    *cur_thread_num = num_replicas;
+    pthread_create(&replica_thread[*cur_thread_num], NULL, handle_replica_ack, cur_thread_num);
+    num_replicas++;
 }
 
-void wait_command(int connFd){
+void* wait_command(void*args){
+
+    struct WaitThreadArgs* waitThreadArgs = (struct WaitThreadArgs*)args;
+    int connFd = waitThreadArgs->connFd;
+    int expected_replicas = waitThreadArgs->expected_replica;
+    long waitTime = waitThreadArgs->waitTime;
 
     char send_buffer[100];
-    snprintf(send_buffer, sizeof send_buffer, WAIT_RESPONSE, num_replicas);
-    send(connFd, send_buffer, strlen(send_buffer), 0);
+    struct timeval start_time, cur_time, time_difference;
+    gettimeofday(&start_time, NULL);
+    uint64_t millis;
+    while(1) {
+        gettimeofday(&cur_time,NULL);
+        timersub(&cur_time, &start_time, &time_difference);
+        millis = (time_difference.tv_sec * (uint64_t)1000) + (time_difference.tv_usec / 1000);
+        if(millis > waitTime || replicas_acknowledged>=expected_replicas){
+            snprintf(send_buffer, sizeof send_buffer, WAIT_RESPONSE, replicas_acknowledged);
+            send(connFd, send_buffer, strlen(send_buffer), 0);
+            printf("WAIT Response %s sent\n", send_buffer);
+            fflush(stdout);
+            return NULL;
+        }
+    }
 }
 
 int doReplicaStuff(char* master_host, char* master_port, int my_port){
@@ -195,22 +262,24 @@ void send_to_replicas(char **commands, int commandLen){
         return;
     char* writeBuffer;
     int value_len = serialize_strs(&writeBuffer, commands, commandLen);
-//    int replica_fd;
+
+    pthread_mutex_lock(&ack_mutex);
+    replicas_acknowledged=0;
+    pthread_mutex_unlock(&ack_mutex);
+
     for(int i=0;i<num_replicas; i++){
-//        if ((replica_fd = socket(replicas_addr[i].sin_family, SOCK_STREAM,0)) == -1) {
-//            perror("master: socket");
-//            continue;
-//        }
-//        if (connect(replica_fd, (struct sockaddr *)&replicas_addr[i], sizeof replicas_addr[i]) == -1) {
-//            perror("master: connect");
-//            close(replica_fd);
-//            continue;
-//        }
-//        printf("Sending Command to Replica %s\n", inet_ntoa(replicas_addr[i].sin_addr));
         send_helper(replicas_fd[i], writeBuffer, value_len);
-//        close(replica_fd);
+        replicas_offset[i]+=value_len;
     }
+
     free(writeBuffer);
+}
+
+void send_ack_request(){
+    for(int i=0;i<num_replicas; i++){
+        replicas_offset[i]+=(int)strlen(GET_ACK_COMMAND);
+        send_helper(replicas_fd[i], GET_ACK_COMMAND, strlen(GET_ACK_COMMAND));
+    }
 }
 
 #endif
