@@ -16,9 +16,13 @@
 #define REPLCONF_MESSAGE_2 "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n"
 #define HANDSHAKE_MESSAGE_3 "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n"
 #define EMPTY_RDB "empty.rdb"
+#define MAX_REPLICAS 100
 
 void info_command(int);
-void doReplicaStuff(char*,char*,int);
+int doReplicaStuff(char*,char*,int);
 void psync_command(int);
+void replconf_command(int , char **, int);
+void send_to_replicas(char **, int );
+
 
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H

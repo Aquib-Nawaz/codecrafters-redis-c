@@ -12,6 +12,38 @@
 
 #if 1
 int replica_of=0;
+int  replicas_fd[MAX_REPLICAS];
+int num_replicas=0;
+
+void replconf_command(int connFd, char** commands, int commandLen){
+    if(commandLen!=3)
+        return;
+
+
+    if(strcmp(commands[1], LISTENING_PORT)==0){
+        if(num_replicas==MAX_REPLICAS)
+            return;
+        replicas_fd[num_replicas++] = connFd;
+
+        /*
+        struct sockaddr_storage addr;
+        socklen_t len = sizeof (addr);
+        getpeername(connFd, (struct sockaddr*)&addr, &len);
+        if(addr.ss_family==AF_INET){
+            replicas_addr[num_replicas] = *(struct sockaddr_in*)&addr;
+            replicas_addr[num_replicas].sin_port = htons(strtol(commands[2], NULL, 10));
+//        replicas_addr[num_replicas].sin_family = AF_INET;
+            printf("New replica at %s:%s\n", inet_ntoa(replicas_addr[num_replicas].sin_addr), commands[2]);
+            num_replicas++;
+        }
+        else{
+            printf("You need to handle ipv6\n");
+            return;
+        }
+         */
+    }
+    send(connFd, ok, strlen(ok), 0);
+}
 
 void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
@@ -61,7 +93,7 @@ void psync_command(int connFd){
     fclose(fptr);
 }
 
-void doReplicaStuff(char* master_host, char* master_port, int my_port){
+int doReplicaStuff(char* master_host, char* master_port, int my_port){
     replica_of=1;
     int master_fd;
     struct addrinfo hints;
@@ -114,7 +146,7 @@ void doReplicaStuff(char* master_host, char* master_port, int my_port){
     char read_buffer[200];
     ssize_t nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
     if(nbytes<=0)
-        return;
+        return -1;
     assert(strncmp(read_buffer, pingMessage, nbytes)==0);
     msg = malloc(3*sizeof (char*));
     msg[0]=REPLCONF;
@@ -127,19 +159,47 @@ void doReplicaStuff(char* master_host, char* master_port, int my_port){
     free(msg);
     nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
     if(nbytes<=0)
-        return;
+        return -1;
     assert(strncmp(read_buffer, ok, nbytes)==0);
     send_helper(master_fd, REPLCONF_MESSAGE_2, strlen(REPLCONF_MESSAGE_2));
     nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
     if(nbytes<=0)
-        return;
+        return -1;
     assert(strncmp(read_buffer, ok, nbytes)==0);
     send_helper(master_fd, HANDSHAKE_MESSAGE_3, strlen(HANDSHAKE_MESSAGE_3));
     nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    if(nbytes<=70)
+        nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+
     assert(nbytes<sizeof read_buffer);
-    close(master_fd);
+    return master_fd;
 
 }
+
+void send_to_replicas(char **commands, int commandLen){
+    if(replica_of)
+        return;
+    char* writeBuffer;
+    int value_len = serialize_strs(&writeBuffer, commands, commandLen);
+//    int replica_fd;
+    for(int i=0;i<num_replicas; i++){
+//        if ((replica_fd = socket(replicas_addr[i].sin_family, SOCK_STREAM,0)) == -1) {
+//            perror("master: socket");
+//            continue;
+//        }
+//        if (connect(replica_fd, (struct sockaddr *)&replicas_addr[i], sizeof replicas_addr[i]) == -1) {
+//            perror("master: connect");
+//            close(replica_fd);
+//            continue;
+//        }
+//        printf("Sending Command to Replica %s\n", inet_ntoa(replicas_addr[i].sin_addr));
+        send_helper(replicas_fd[i], writeBuffer, value_len);
+//        close(replica_fd);
+    }
+    fflush(stdout);
+    free(writeBuffer);
+}
+
 #endif
 #if 0
 int main()

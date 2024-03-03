@@ -5,7 +5,7 @@
 #ifndef REDIS_MESSAGE_H
 #define REDIS_MESSAGE_H
 
-void deCodeRedisMessage(char*, int, char ***, int *);
+int deCodeRedisMessage(char*, int, char ***, int *);
 void toLower(char*);
 int serialize_str(char **writeBuffer, char* str, int bulk);
 int serialize_strs(char **writeBuffer, char** strs,int size);
@@ -17,6 +17,9 @@ int calculate_buffer_len(char **, int);
 #define ping "ping"
 #define pingMessage "+PONG\r\n"
 #define get "get"
+#define replconf "replconf"
+#define psync "psync"
+
 static char* set = "set";
 static char* ok = "+OK\r\n";
 static char* nil = "$-1\r\n";

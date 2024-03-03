@@ -55,13 +55,16 @@ int serialize_strs(char **writeBuffer, char** strs, int size){
     return idx;
 }
 
-void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
+int deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayLen){
     int newMsg = 0, newKeyword=0, keywordLen=0, keywordNum=-1;
 //    printf("Decoding Message:- %s\n", message);
-    for(int i=0; i<msgSize; i++){
+    int i;
+    for(i=0; i<msgSize; i++){
         char c = message[i];
         switch(c){
             case '*':
+                if(i!=0)
+                    return i;
                 newMsg = 1;
                 *arrayLen=0;
                 printf("New Message\n");
@@ -69,6 +72,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
             case '$':
                 newKeyword = 1;
                 keywordNum+=1;
+                assert(keywordNum<*arrayLen);
                 keywordLen = 0;
                 break;
             case '\r':
@@ -114,6 +118,7 @@ void deCodeRedisMessage(char *message, int msgSize, char ***commands, int *array
                 }
         }
     }
+    return i;
 
 }
 

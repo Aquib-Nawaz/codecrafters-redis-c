@@ -21,6 +21,7 @@ static struct {
 
 char dir[128]="";
 char dbfilename[128]="";
+int master_fd=-1;
 
 void parseMessage(char **commands, int commandLen, int connFd){
 
@@ -41,11 +42,15 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			}
 			free(writeBuffer);
 		}
+		//write command
 		else if(strcmp(set, commands[0])==0 && commandLen>=3){
 			do_set(commands, commandLen,&g_data.db );
-			if ((sentBytes = send(connFd, ok, strlen(ok), 0)) == -1) {
-				perror("send\n");
+			if(master_fd!=connFd){
+				if ((sentBytes = send(connFd, ok, strlen(ok), 0)) == -1) {
+					perror("send\n");
+				}
 			}
+			send_to_replicas(commands, commandLen);
 		}
         //check if command matches with get
 		else if(strcmp(get, commands[0])==0 && commandLen>=2){
@@ -94,10 +99,10 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else if(strcmp(commands[0],INFO)==0){
 			info_command(connFd);
 		}
-		else if(strcmp(commands[0], "replconf")==0){
-			send(connFd, ok, strlen(ok), 0);
+		else if(strcmp(commands[0], replconf)==0){
+			replconf_command(connFd, commands, commandLen);
 		}
-		else if(strcmp(commands[0], "psync")==0){
+		else if(strcmp(commands[0], psync)==0){
 			psync_command(connFd);
 		}
     }
@@ -179,7 +184,7 @@ int main(int argc, char *argv[]) {
 	setbuf(stdout, NULL);
     doDbFileStuff();
 	if(replica_of)
-    	doReplicaStuff(master_host, master_port, port);
+    	master_fd = doReplicaStuff(master_host, master_port, port);
 
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	printf("Logs from your program will appear here!\n");
@@ -232,9 +237,11 @@ int main(int argc, char *argv[]) {
 
 	 fd_set master, current;
 	 FD_SET(server_fd, &master);
+	 if(master_fd!=-1)
+		 FD_SET(master_fd, &master);
 	 int max_socket_fd = server_fd+1;
      int client_fd;
-	 char buffer[128];
+	 char buffer[1024];
 	 char ** commands;
 	 int commandLen;
 	 size_t nbytes;
@@ -270,10 +277,16 @@ int main(int argc, char *argv[]) {
 						 FD_CLR(i, &master);
 						 break;
 					 }
-					 deCodeRedisMessage(buffer, nbytes, &commands, &commandLen);
-                     parseMessage(commands, commandLen, i);
-					 for(int k=0; k<commandLen; k++){free(commands[k]);}
-					 free(commands);
+					 int parsed_len=0;
+					 do {
+						 commands=NULL;
+						 parsed_len += deCodeRedisMessage(buffer+parsed_len, nbytes, &commands, &commandLen);
+						 parseMessage(commands, commandLen, i);
+						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }
+						 if(commands)
+						 	free(commands);
+					 }
+					 while(parsed_len<nbytes);
 				 }
 			 }
 		 }
