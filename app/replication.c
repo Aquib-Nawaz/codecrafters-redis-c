@@ -46,7 +46,7 @@ void replconf_command(int connFd, char** commands, int commandLen){
     }
     if(strcmp(commands[1], GET_ACK)==0){
         char writeBuffer[100];
-        int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY, 0);
+        int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY, master_offset);
         send(connFd, writeBuffer, value_len, 0);
     }
     send(connFd, ok, strlen(ok), 0);

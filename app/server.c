@@ -31,7 +31,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
     if(commandLen>0){
         toLower(commands[0]);
         if(strcmp(ping, commands[0])==0){
-            if( (sentBytes = send(connFd, pingMessage, strlen( pingMessage ), 0))==-1){
+            if(master_fd!=connFd && (sentBytes = send(connFd, pingMessage, strlen( pingMessage ), 0))==-1){
                 perror("send\n");
             }
         }
