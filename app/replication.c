@@ -40,7 +40,7 @@ void replconf_command(int connFd, char** commands, int commandLen){
     }
 
     else if(strcmp(commands[1], GET_ACK)==0){
-        printf("Recieved ack from master, current-offset %d\n", master_offset);
+        printf("Received ack from master, current-offset %d\n", master_offset);
         char writeBuffer[100];
         int offset_size = snprintf(NULL, 0, "%d", master_offset);
         int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY,

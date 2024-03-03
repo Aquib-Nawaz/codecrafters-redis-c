@@ -283,14 +283,18 @@ int main(int argc, char *argv[]) {
 					 do {
 						 commands=NULL;
 						 commandLen=0;
-						 cur_parsed = deCodeRedisMessage(buffer+parsed_len, nbytes, &commands, &commandLen);
+						 cur_parsed = deCodeRedisMessage(buffer+parsed_len, nbytes-parsed_len, &commands, &commandLen);
 						 parsed_len+=cur_parsed;
 						 parseMessage(commands, commandLen, i);
+
+						 if(replica_of&&i==master_fd){
+							printf("Received command %s from master increasing offset by %d\n", commands[0], cur_parsed);
+							 master_offset+=cur_parsed;
+						 }
 						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }
 						 if(commands)
-						 	free(commands);
-						 if(replica_of&&i==master_fd)
-							 master_offset+=cur_parsed;
+							 free(commands);
+						 fflush(stdout);
 					 }
 					 while(parsed_len<nbytes);
 
