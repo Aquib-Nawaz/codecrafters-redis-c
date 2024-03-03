@@ -90,7 +90,9 @@ void psync_command(int connFd){
 
 void wait_command(int connFd){
 
-    send(connFd, WAIT_RESPONSE, strlen(WAIT_RESPONSE), 0);
+    char send_buffer[100];
+    snprintf(send_buffer, sizeof send_buffer, WAIT_RESPONSE, num_replicas);
+    send(connFd, send_buffer, strlen(send_buffer), 0);
 }
 
 int doReplicaStuff(char* master_host, char* master_port, int my_port){
