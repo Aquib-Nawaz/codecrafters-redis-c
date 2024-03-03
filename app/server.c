@@ -273,6 +273,7 @@ int main(int argc, char *argv[]) {
 						 else{
 							 perror("receive\n");
 						 }
+
 						 close(i);
 						 FD_CLR(i, &master);
 						 break;
@@ -280,6 +281,7 @@ int main(int argc, char *argv[]) {
 					 int parsed_len=0;
 					 do {
 						 commands=NULL;
+						 commandLen=0;
 						 parsed_len += deCodeRedisMessage(buffer+parsed_len, nbytes, &commands, &commandLen);
 						 parseMessage(commands, commandLen, i);
 						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }

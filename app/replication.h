@@ -24,5 +24,4 @@ void psync_command(int);
 void replconf_command(int , char **, int);
 void send_to_replicas(char **, int );
 
-
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H
