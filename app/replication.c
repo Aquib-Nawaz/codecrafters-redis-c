@@ -14,6 +14,8 @@
 int replica_of=0;
 int  replicas_fd[MAX_REPLICAS];
 int num_replicas=0;
+int master_fd=-1;
+int master_offset=0;
 
 void replconf_command(int connFd, char** commands, int commandLen){
     if(commandLen!=3)
@@ -41,6 +43,11 @@ void replconf_command(int connFd, char** commands, int commandLen){
             return;
         }
          */
+    }
+    if(strcmp(commands[1], GET_ACK)==0){
+        char writeBuffer[100];
+        int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY, 0);
+        send(connFd, writeBuffer, value_len, 0);
     }
     send(connFd, ok, strlen(ok), 0);
 }
@@ -95,7 +102,6 @@ void psync_command(int connFd){
 
 int doReplicaStuff(char* master_host, char* master_port, int my_port){
     replica_of=1;
-    int master_fd;
     struct addrinfo hints;
     struct addrinfo *servinfo, *p;  // will point to the results
 

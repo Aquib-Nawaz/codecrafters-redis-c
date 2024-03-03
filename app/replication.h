@@ -17,6 +17,8 @@
 #define HANDSHAKE_MESSAGE_3 "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n"
 #define EMPTY_RDB "empty.rdb"
 #define MAX_REPLICAS 100
+#define GETACK_REPLY "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n%d\r\n"
+#define GET_ACK "GETACK"
 
 void info_command(int);
 int doReplicaStuff(char*,char*,int);

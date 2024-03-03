@@ -21,7 +21,8 @@ static struct {
 
 char dir[128]="";
 char dbfilename[128]="";
-int master_fd=-1;
+extern int master_fd;
+extern int master_offset;
 
 void parseMessage(char **commands, int commandLen, int connFd){
 
@@ -289,6 +290,8 @@ int main(int argc, char *argv[]) {
 						 	free(commands);
 					 }
 					 while(parsed_len<nbytes);
+					 if(replica_of&&i==master_fd)
+						 master_offset+=nbytes;
 				 }
 			 }
 		 }
