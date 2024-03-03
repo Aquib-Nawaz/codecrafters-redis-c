@@ -19,6 +19,7 @@ int calculate_buffer_len(char **, int);
 #define get "get"
 #define replconf "replconf"
 #define psync "psync"
+#define WAIT "wait"
 
 static char* set = "set";
 static char* ok = "+OK\r\n";

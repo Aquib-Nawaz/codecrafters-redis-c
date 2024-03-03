@@ -88,6 +88,11 @@ void psync_command(int connFd){
     fclose(fptr);
 }
 
+void wait_command(int connFd){
+
+    send(connFd, WAIT_RESPONSE, strlen(WAIT_RESPONSE), 0);
+}
+
 int doReplicaStuff(char* master_host, char* master_port, int my_port){
     replica_of=1;
     struct addrinfo hints;
@@ -179,9 +184,6 @@ int doReplicaStuff(char* master_host, char* master_port, int my_port){
     }
 
     recv(master_fd, read_buffer, file_len+1, 0);
-//    if(nbytes<=70)
-//        nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
-//    printf("%zu-%.3s", nbytes, read_buffer);
     return master_fd;
 
 }

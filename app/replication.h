@@ -19,11 +19,13 @@
 #define MAX_REPLICAS 100
 #define GETACK_REPLY "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$%d\r\n%d\r\n"
 #define GET_ACK "getack"
+#define WAIT_RESPONSE ":0\r\n"
 
 void info_command(int);
 int doReplicaStuff(char*,char*,int);
 void psync_command(int);
 void replconf_command(int , char **, int);
 void send_to_replicas(char **, int );
+void wait_command(int);
 
 #endif //CODECRAFTERS_REDIS_C_REPLICATION_H

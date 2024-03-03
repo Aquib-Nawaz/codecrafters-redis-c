@@ -106,6 +106,9 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else if(strcmp(commands[0], psync)==0){
 			psync_command(connFd);
 		}
+		else  if(strcmp(commands[0], WAIT)==0){
+			wait_command(connFd);
+		}
     }
 }
 
@@ -288,7 +291,7 @@ int main(int argc, char *argv[]) {
 						 parseMessage(commands, commandLen, i);
 
 						 if(replica_of&&i==master_fd){
-							printf("Received command %s from master increasing offset by %d\n", commands[0], cur_parsed);
+//							printf("Received command %s from master increasing offset by %d\n", commands[0], cur_parsed);
 							 master_offset+=cur_parsed;
 						 }
 						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }
