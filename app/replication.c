@@ -38,6 +38,7 @@ void send_helper(int connFd, char* writeBuffer,int value_len){
 
 void* handle_replica_ack(void *args){
     int thread_num = *((int*)args);
+    free(args);
     int connFd = replicas_fd[thread_num];
     assert(connFd>0);
     char read_buffer[100];
@@ -143,7 +144,8 @@ void* wait_command(void*args){
     int connFd = waitThreadArgs->connFd;
     int expected_replicas = waitThreadArgs->expected_replica;
     long waitTime = waitThreadArgs->waitTime;
-
+    printf("Wait Command Started at connection socket %d, for %ld\n", connFd, waitTime);
+    fflush(stdout);
     char send_buffer[100];
     struct timeval start_time, cur_time, time_difference;
     gettimeofday(&start_time, NULL);
@@ -152,11 +154,12 @@ void* wait_command(void*args){
         gettimeofday(&cur_time,NULL);
         timersub(&cur_time, &start_time, &time_difference);
         millis = (time_difference.tv_sec * (uint64_t)1000) + (time_difference.tv_usec / 1000);
-        if(millis > waitTime || replicas_acknowledged>=expected_replicas){
+        if(millis >= waitTime || replicas_acknowledged>=expected_replicas){
             snprintf(send_buffer, sizeof send_buffer, WAIT_RESPONSE, replicas_acknowledged);
             send(connFd, send_buffer, strlen(send_buffer), 0);
             printf("WAIT Response %s sent\n", send_buffer);
             fflush(stdout);
+            free(args);
             return NULL;
         }
     }

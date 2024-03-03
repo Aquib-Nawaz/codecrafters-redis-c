@@ -110,13 +110,13 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else  if(strcmp(commands[0], WAIT)==0){
 			if(commandLen==3){
 				send_ack_request();
-				struct WaitThreadArgs args;
-				args.connFd = connFd;
-				args.expected_replica = (int)strtol(commands[1], NULL, 10);
-				args.waitTime = strtol(commands[2], NULL, 10);
+				printf("Wait Command Starting for connection %d-%s\n", connFd, commands[2]);
+				struct WaitThreadArgs* args= malloc(sizeof (*args));
+				args->connFd = connFd;
+				args->expected_replica = (int)strtol(commands[1], NULL, 10);
+				args->waitTime = strtol(commands[2], NULL, 10);
 				pthread_t thread;
-				pthread_create(&thread, NULL, wait_command, &args);
-				wait_command(&args);
+				pthread_create(&thread, NULL, wait_command, args);
 			}
 		}
     }
