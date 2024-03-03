@@ -279,19 +279,21 @@ int main(int argc, char *argv[]) {
 						 FD_CLR(i, &master);
 						 break;
 					 }
-					 int parsed_len=0;
+					 int parsed_len=0, cur_parsed;
 					 do {
 						 commands=NULL;
 						 commandLen=0;
-						 parsed_len += deCodeRedisMessage(buffer+parsed_len, nbytes, &commands, &commandLen);
+						 cur_parsed = deCodeRedisMessage(buffer+parsed_len, nbytes, &commands, &commandLen);
+						 parsed_len+=cur_parsed;
 						 parseMessage(commands, commandLen, i);
 						 for (int k = 0; k < commandLen; k++) { free(commands[k]); }
 						 if(commands)
 						 	free(commands);
+						 if(replica_of&&i==master_fd)
+							 master_offset+=cur_parsed;
 					 }
 					 while(parsed_len<nbytes);
-					 if(replica_of&&i==master_fd)
-						 master_offset+=nbytes;
+
 				 }
 			 }
 		 }

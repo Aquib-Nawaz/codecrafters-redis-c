@@ -17,50 +17,38 @@ int num_replicas=0;
 int master_fd=-1;
 int master_offset=0;
 
-void replconf_command(int connFd, char** commands, int commandLen){
-    if(commandLen!=3)
-        return;
-
-
-    if(strcmp(commands[1], LISTENING_PORT)==0){
-        if(num_replicas==MAX_REPLICAS)
-            return;
-        replicas_fd[num_replicas++] = connFd;
-
-        /*
-        struct sockaddr_storage addr;
-        socklen_t len = sizeof (addr);
-        getpeername(connFd, (struct sockaddr*)&addr, &len);
-        if(addr.ss_family==AF_INET){
-            replicas_addr[num_replicas] = *(struct sockaddr_in*)&addr;
-            replicas_addr[num_replicas].sin_port = htons(strtol(commands[2], NULL, 10));
-//        replicas_addr[num_replicas].sin_family = AF_INET;
-            printf("New replica at %s:%s\n", inet_ntoa(replicas_addr[num_replicas].sin_addr), commands[2]);
-            num_replicas++;
-        }
-        else{
-            printf("You need to handle ipv6\n");
-            return;
-        }
-         */
-    }
-    if(strcmp(commands[1], GET_ACK)==0){
-        char writeBuffer[100];
-        int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY, master_offset);
-        send(connFd, writeBuffer, value_len, 0);
-    }
-    send(connFd, ok, strlen(ok), 0);
-}
-
 void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
     do {
         sentBytes = send(connFd, writeBuffer, value_len, 0);
         value_len -= sentBytes;
+        writeBuffer += sentBytes;
     }while(sentBytes!=-1 && value_len>0);
     if(sentBytes==-1){
         perror("send\n");
     }
+}
+
+void replconf_command(int connFd, char** commands, int commandLen){
+    if(commandLen!=3)
+        return;
+    toLower(commands[1]);
+    if(strcmp(commands[1], LISTENING_PORT)==0){
+        if(num_replicas==MAX_REPLICAS)
+            return;
+        replicas_fd[num_replicas++] = connFd;
+    }
+
+    else if(strcmp(commands[1], GET_ACK)==0){
+        printf("Recieved ack from master, current-offset %d\n", master_offset);
+        char writeBuffer[100];
+        int offset_size = snprintf(NULL, 0, "%d", master_offset);
+        int value_len = snprintf(writeBuffer, sizeof writeBuffer, GETACK_REPLY,
+                                offset_size, master_offset);
+        send_helper(connFd, writeBuffer, value_len);
+        return;
+    }
+    send(connFd, ok, strlen(ok), 0);
 }
 
 void info_command(int connFd){
@@ -150,7 +138,7 @@ int doReplicaStuff(char* master_host, char* master_port, int my_port){
     freeaddrinfo(servinfo); // all done with this structure
 
     char read_buffer[200];
-    ssize_t nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    ssize_t nbytes = recv(master_fd, read_buffer, strlen(pingMessage), 0);
     if(nbytes<=0)
         return -1;
     assert(strncmp(read_buffer, pingMessage, nbytes)==0);
@@ -173,11 +161,27 @@ int doReplicaStuff(char* master_host, char* master_port, int my_port){
         return -1;
     assert(strncmp(read_buffer, ok, nbytes)==0);
     send_helper(master_fd, HANDSHAKE_MESSAGE_3, strlen(HANDSHAKE_MESSAGE_3));
-    nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
-    if(nbytes<=70)
-        nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+    nbytes = recv(master_fd, read_buffer, 55, 0);
+    char c;
+    do{
+        recv(master_fd, &c, 1, 0);
+    }
+    while(c!='\n');
+//    recv(master_fd, &c, 1, 0);
+    recv(master_fd, &c, 1, 0);
+    assert(c=='$');
+    recv(master_fd, &c, 1, 0);
+    int file_len=0;
+    while(c!='\r'){
+        file_len*=10;
+        file_len+=c-'0';
+        recv(master_fd, &c, 1, 0);
+    }
 
-    assert(nbytes<sizeof read_buffer);
+    recv(master_fd, read_buffer, file_len+1, 0);
+//    if(nbytes<=70)
+//        nbytes = recv(master_fd, read_buffer, sizeof read_buffer, 0);
+//    printf("%zu-%.3s", nbytes, read_buffer);
     return master_fd;
 
 }
@@ -202,7 +206,6 @@ void send_to_replicas(char **commands, int commandLen){
         send_helper(replicas_fd[i], writeBuffer, value_len);
 //        close(replica_fd);
     }
-    fflush(stdout);
     free(writeBuffer);
 }
 

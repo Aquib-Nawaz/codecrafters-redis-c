@@ -118,6 +118,7 @@ int deCodeRedisMessage(char *message, int msgSize, char ***commands, int *arrayL
                 }
         }
     }
+    *arrayLen = keywordNum+1;
     return i;
 
 }
