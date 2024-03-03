@@ -34,6 +34,33 @@ void info_command(int connFd){
     free(writeBuffer);
 }
 
+void psync_command(int connFd){
+    if(replica_of)
+        return;
+    char * writeBuffer;
+    int value_len = snprintf(NULL, 0 ,"+FULLRESYNC %s 0\r\n", REPLICATION_ID);
+    writeBuffer = malloc(value_len+1);
+    sprintf(writeBuffer, "+FULLRESYNC %s 0\r\n", REPLICATION_ID);
+    send(connFd, writeBuffer, value_len, 0);
+    free(writeBuffer);
+    FILE* fptr = fopen(EMPTY_RDB, "rb");
+    if(!fptr){
+        perror("fopen\n");
+        return;
+    }
+    fseek(fptr, 0, SEEK_END);
+    int file_size = (int)ftell(fptr);
+    fseek(fptr, 0, SEEK_SET);
+    int prefix_size = snprintf(NULL, 0 ,"$%d\r\n", file_size);
+    value_len = prefix_size+file_size;
+    writeBuffer = malloc(value_len+1);
+    snprintf(writeBuffer, value_len+1, "$%d\r\n", file_size);
+    fread(writeBuffer+prefix_size, 1,file_size, fptr);
+    send_helper(connFd, writeBuffer, value_len);
+    free(writeBuffer);
+    fclose(fptr);
+}
+
 void doReplicaStuff(char* master_host, char* master_port, int my_port){
     replica_of=1;
     int master_fd;

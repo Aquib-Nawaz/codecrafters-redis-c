@@ -98,11 +98,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			send(connFd, ok, strlen(ok), 0);
 		}
 		else if(strcmp(commands[0], "psync")==0){
-			int value_len = snprintf(NULL, 0 ,"+FULLRESYNC %s 0\r\n", REPLICATION_ID);
-			writeBuffer = malloc(value_len+1);
-			sprintf(writeBuffer, "+FULLRESYNC %s 0\r\n", REPLICATION_ID);
-			send(connFd, writeBuffer, value_len, 0);
-			free(writeBuffer);
+			psync_command(connFd);
 		}
     }
 }
