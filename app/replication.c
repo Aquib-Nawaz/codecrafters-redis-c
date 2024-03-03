@@ -45,7 +45,7 @@ void psync_command(int connFd){
     free(writeBuffer);
     FILE* fptr = fopen(EMPTY_RDB, "rb");
     if(!fptr){
-        perror("fopen\n");
+        perror("fopen");
         return;
     }
     fseek(fptr, 0, SEEK_END);
