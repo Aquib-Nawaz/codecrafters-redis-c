@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 static void h_init(struct HTab *htab, size_t n) {
     assert(n>0 && (n&(n-1))==0);
@@ -61,7 +62,7 @@ static void hm_help_resizing(struct HMap *hmap) {
             continue;
         }
         struct HNode *detached_node = h_detach(&hmap->t2, from);
-        struct Entry * entry = container_of( detached_node, struct Entry,node);
+        struct Entry_Str * entry = container_of(detached_node, struct Entry_Str, node);
         //check if expiry is set and is expired
         if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
             delete_entry(entry);
@@ -142,18 +143,27 @@ unsigned long hash( char *str)
     unsigned long hash = 5381;
     int c;
 
-    while ((c = *str++))
+    while ((c = (unsigned char )*str++))
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
     return hash;
 }
 
 int entry_eq(struct HNode *lhs, struct HNode *rhs) {
-    struct Entry *le = container_of(lhs, struct Entry, node);
-    struct Entry *re = container_of(rhs, struct Entry, node);
-    return strcmp(le->key, re->key)==0;
+    if(lhs->type!=rhs->type)
+        return 0;
+    char* lkey, *rkey;
+    if(lhs->type==ENTRY_STR) {
+        lkey = container_of(lhs, struct Entry_Str, node)->key;
+        rkey = container_of(rhs, struct Entry_Str, node)->key;
+    }
+    else if(lhs->type==ENTRY_STREAM){
+        lkey = container_of(lhs, struct Entry_Stream, node)->key;
+        rkey = container_of(rhs, struct Entry_Stream, node)->key;
+    }
+    return strcmp(lkey, rkey)==0;
 }
-void delete_entry(struct Entry* entry){
+void delete_entry(struct Entry_Str* entry){
     free(entry->value);
     free(entry->key);
     free(entry);
@@ -177,10 +187,10 @@ int h_scan(char **ret, struct HTab* htab){
     for(int i=0; i<=htab->mask; i++) {
         struct HNode **from = &htab->tab[i];
         for (struct HNode *cur; (cur = *from) != NULL; from = &cur->next) {
-            struct Entry* entry = container_of(*from, struct Entry, node);
+            struct Entry_Str* entry = container_of(*from, struct Entry_Str, node);
             if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
                 h_detach(htab, from);
-                free(entry);
+                delete_entry(entry);
             }
             else{
                 ret[idx++] = entry->key;
@@ -192,7 +202,7 @@ int h_scan(char **ret, struct HTab* htab){
 }
 
 int hm_scan(char ***ret, struct HMap *hmap){
-    int size = hm_size(hmap);
+    int size = (int)hm_size(hmap);
     (*ret) = (char **)calloc(size, sizeof (char *));
     int s1 = h_scan(*ret, &hmap->t1);
     s1 += h_scan(*ret+s1, &hmap->t2);
@@ -218,13 +228,13 @@ void set_expiry(struct timeval* tm, long ms){
 void do_set (char **commands, int commandLen, struct HMap* hmap){
 	if(commandLen<3)
 		return;
-	struct Entry keyEntry;
+	struct Entry_Str keyEntry;
 	char* key = commands[1], *value = commands[2];
 	keyEntry.node.hcode = hash(key);
 	keyEntry.key=key;
 	struct HNode* node = hm_lookup(hmap,  &keyEntry.node, entry_eq);
 	if(node){
-		struct Entry * existing = container_of(node, struct Entry, node);
+		struct Entry_Str * existing = container_of(node, struct Entry_Str, node);
 		free(existing->value);
 		existing->value = malloc(strlen(value)+1);
 		strcpy(existing->value, value);
@@ -234,7 +244,7 @@ void do_set (char **commands, int commandLen, struct HMap* hmap){
 		}
 		return;
 	}
-	struct Entry *entry = calloc(1, sizeof (struct Entry));
+	struct Entry_Str *entry = calloc(1, sizeof (struct Entry_Str));
 	entry->key = malloc(strlen(key)+1);
 	entry->value = malloc(strlen(value)+1);
 	strcpy(entry->key, key);
@@ -252,7 +262,7 @@ void do_set (char **commands, int commandLen, struct HMap* hmap){
 char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	if(commandLen<2)
 		return NULL;
-	struct Entry key;
+	struct Entry_Str key;
 	key.node.hcode = hash(commands[1]);
 	key.key = commands[1];
 	struct HNode* node = hm_lookup(hmap, &key.node, entry_eq);
@@ -260,9 +270,9 @@ char* do_get(char** commands, int commandLen, struct HMap* hmap){
 //		printf("Node Not found\n");
 		return nil;
 	}
-	struct Entry * entry = container_of( node, struct Entry,node);
+	struct Entry_Str * entry = container_of(node, struct Entry_Str, node);
 	//check if expiry is set and is expired
-	if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
+    if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
 		hm_pop(hmap, node, entry_eq);
 		delete_entry(entry);
 //		printf("Deleting Node As it is expired\n");
@@ -271,6 +281,43 @@ char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	return entry->value;
 }
 
+bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entry* ret_entry ,int flags){
+    struct timeval expiry;
+    bool ret;
+    void* entry;
+    if((*node)->type==ENTRY_STR) {
+        entry = container_of(*node, struct Entry_Str, node);
+        expiry = ((struct Entry_Str*)entry)->expiry;
+    }
+    else if((*node)->type==ENTRY_STREAM){
+        entry = container_of(*node, struct Entry_Stream, node);
+        expiry = ((struct Entry_Stream*)entry)->expiry;
+    }
+    ret = expiry.tv_sec != 0 && check_expired(&expiry);
+
+    if(ret){
+        if(flags&4)
+            h_detach(tab, node);
+
+        if(flags&2)
+            hm_pop(map, *node, entry_eq);
+
+        if(flags&1)
+            delete_entry(entry);
+    }
+    else {
+        if((*node)->type==ENTRY_STR) {
+            ret_entry->key = ((struct Entry_Str*)entry)->key;
+            ret_entry->value = ((struct Entry_Str*)entry)->value;
+        }
+        else if((*node)->type==ENTRY_STREAM){
+            ret_entry->key = ((struct Entry_Stream*)entry)->key;
+            ret_entry->value = ((struct Entry_Stream*)entry)->value;
+            ret_entry->id = ((struct Entry_Stream*)entry)->id;
+        }
+    }
+    return ret;
+}
 
 #if 0
 struct {

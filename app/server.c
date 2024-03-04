@@ -142,7 +142,7 @@ void doDbFileStuff(){
     getData(&data, fptr, &len);
     for(int i=0;i<len-2; i+=3){
         printf("%s->%s\n", data[i+1], data[i+2]);
-        struct Entry *entry = calloc(1, sizeof (struct Entry));
+        struct Entry_Str *entry = calloc(1, sizeof (struct Entry_Str));
 		switch(data[i][0]) {
 			unsigned long t2;
 			unsigned int t1;
