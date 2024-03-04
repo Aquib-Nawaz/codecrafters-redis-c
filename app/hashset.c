@@ -62,14 +62,9 @@ static void hm_help_resizing(struct HMap *hmap) {
             continue;
         }
         struct HNode *detached_node = h_detach(&hmap->t2, from);
-        struct Entry_Str * entry = container_of(detached_node, struct Entry_Str, node);
-        //check if expiry is set and is expired
-        if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
-            delete_entry(entry);
-        }
-        else {
+        Entry ret_entry;
+        if(!entry_expired(&detached_node, NULL, NULL, NULL, 1))
             h_insert(&hmap->t1, detached_node);
-        }
         nwork++;
     }
 
@@ -161,12 +156,30 @@ int entry_eq(struct HNode *lhs, struct HNode *rhs) {
         lkey = container_of(lhs, struct Entry_Stream, node)->key;
         rkey = container_of(rhs, struct Entry_Stream, node)->key;
     }
+    else
+        return 1;
     return strcmp(lkey, rkey)==0;
 }
-void delete_entry(struct Entry_Str* entry){
+
+void delete_str(struct Entry_Str* entry){
     free(entry->value);
     free(entry->key);
     free(entry);
+}
+
+void delete_stream(struct Entry_Stream* entry){
+    free(entry->value);
+    free(entry->key);
+    free(entry->id);
+    free(entry);
+}
+
+
+void delete_entry(void * entry, int type){
+    if(type==ENTRY_STR)
+        delete_str((struct Entry_Str*)entry);
+    else if(type==ENTRY_STREAM)
+        delete_stream((struct Entry_Stream*)entry);
 }
 
 int check_expired(struct timeval *expiry){
@@ -184,16 +197,14 @@ int h_scan(char **ret, struct HTab* htab){
         return 0;
     int idx=0;
 
+    Entry entry;
     for(int i=0; i<=htab->mask; i++) {
         struct HNode **from = &htab->tab[i];
         for (struct HNode *cur; (cur = *from) != NULL; from = &cur->next) {
-            struct Entry_Str* entry = container_of(*from, struct Entry_Str, node);
-            if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
-                h_detach(htab, from);
-                delete_entry(entry);
-            }
-            else{
-                ret[idx++] = entry->key;
+
+            if(!entry_expired(from, NULL, htab, &entry, 5))
+            {
+                ret[idx++] = entry.key;
             }
         }
     }
@@ -265,31 +276,29 @@ char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	struct Entry_Str key;
 	key.node.hcode = hash(commands[1]);
 	key.key = commands[1];
+    key.node.type=ENTRY_STR;
 	struct HNode* node = hm_lookup(hmap, &key.node, entry_eq);
 	if(!node){
-//		printf("Node Not found\n");
 		return nil;
 	}
-	struct Entry_Str * entry = container_of(node, struct Entry_Str, node);
-	//check if expiry is set and is expired
-    if(entry->expiry.tv_sec!=0 && check_expired(&entry->expiry)){
-		hm_pop(hmap, node, entry_eq);
-		delete_entry(entry);
-//		printf("Deleting Node As it is expired\n");
-		return nil;
-	}
-	return entry->value;
+    Entry ret_entry;
+    if(entry_expired(&node, hmap, NULL, &ret_entry, 3)){
+        return nil;
+    }
+
+	return ret_entry.value;
 }
 
 bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entry* ret_entry ,int flags){
     struct timeval expiry;
     bool ret;
     void* entry;
-    if((*node)->type==ENTRY_STR) {
+    int node_type = (*node)->type;
+    if(node_type==ENTRY_STR) {
         entry = container_of(*node, struct Entry_Str, node);
         expiry = ((struct Entry_Str*)entry)->expiry;
     }
-    else if((*node)->type==ENTRY_STREAM){
+    else if(node_type==ENTRY_STREAM){
         entry = container_of(*node, struct Entry_Stream, node);
         expiry = ((struct Entry_Stream*)entry)->expiry;
     }
@@ -303,14 +312,14 @@ bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entr
             hm_pop(map, *node, entry_eq);
 
         if(flags&1)
-            delete_entry(entry);
+            delete_entry(entry, node_type);
     }
-    else {
-        if((*node)->type==ENTRY_STR) {
+    else if(ret_entry!=NULL){
+        if(node_type==ENTRY_STR) {
             ret_entry->key = ((struct Entry_Str*)entry)->key;
             ret_entry->value = ((struct Entry_Str*)entry)->value;
         }
-        else if((*node)->type==ENTRY_STREAM){
+        else if(node_type==ENTRY_STREAM){
             ret_entry->key = ((struct Entry_Stream*)entry)->key;
             ret_entry->value = ((struct Entry_Stream*)entry)->value;
             ret_entry->id = ((struct Entry_Stream*)entry)->id;

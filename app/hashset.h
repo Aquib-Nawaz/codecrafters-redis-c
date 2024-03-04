@@ -67,7 +67,7 @@ void do_set (char **commands, int commandLen, struct HMap* hmap);
 char* do_get(char** commands, int commandLen, struct HMap* hmap);
 
 int entry_eq(struct HNode *lhs, struct HNode *rhs);
-void delete_entry(struct Entry_Str* entry);
+void delete_entry(void* entry, int);
 
 unsigned long hash(char *str);
 struct HNode *hm_lookup(struct HMap *hmap, struct HNode *key, int (*eq)(struct HNode *, struct HNode *));
