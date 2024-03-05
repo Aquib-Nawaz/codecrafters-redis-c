@@ -20,6 +20,8 @@ int calculate_buffer_len(char **, int);
 #define replconf "replconf"
 #define psync "psync"
 #define WAIT "wait"
+#define type "type"
+
 
 static char* set = "set";
 static char* ok = "+OK\r\n";

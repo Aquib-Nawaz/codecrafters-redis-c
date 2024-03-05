@@ -15,6 +15,7 @@
 #include "hashset.h"
 #include "parser.h"
 #include "replication.h"
+#include "stream.h"
 
 static struct {
 	struct HMap db;
@@ -119,6 +120,10 @@ void parseMessage(char **commands, int commandLen, int connFd){
 				pthread_create(&thread, NULL, wait_command, args);
 			}
 		}
+        else if(strcmp(commands[0], type)==0){
+            if(commandLen>=2)
+                type_command(connFd, commands[1], &g_data.db);
+        }
     }
 }
 

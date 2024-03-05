@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <unistd.h>
-#include <stdio.h>
 #include <stdbool.h>
 
 static void h_init(struct HTab *htab, size_t n) {
@@ -24,7 +22,7 @@ static void h_insert(struct HTab *htab, struct HNode *node) {
     htab->size ++;
 }
 
-static struct HNode **h_lookup(struct HTab *htab, struct HNode *key, int (*eq)(struct HNode *, struct HNode *)) {
+static struct HNode **h_lookup(struct HTab *htab, SearchKey *key, int (*eq)(struct HNode *, SearchKey *)) {
     if(!htab->tab){
         return NULL;
     }
@@ -32,6 +30,8 @@ static struct HNode **h_lookup(struct HTab *htab, struct HNode *key, int (*eq)(s
     struct HNode ** from = &htab->tab[idx];
     for(struct HNode*cur; (cur=*from)!=NULL; from = &cur->next){
         if(cur->hcode == key->hcode && eq(cur, key)) {
+            if(entry_expired(from, NULL, htab, NULL, 5))
+                return NULL;
             return from;
         }
     }
@@ -62,7 +62,6 @@ static void hm_help_resizing(struct HMap *hmap) {
             continue;
         }
         struct HNode *detached_node = h_detach(&hmap->t2, from);
-        Entry ret_entry;
         if(!entry_expired(&detached_node, NULL, NULL, NULL, 1))
             h_insert(&hmap->t1, detached_node);
         nwork++;
@@ -84,7 +83,7 @@ static void hm_start_resizing(struct HMap *hmap) {
     hmap->resizing_pos = 0;
 }
 
-struct HNode *hm_lookup(struct HMap *hmap, struct HNode *key, int (*eq)(struct HNode *, struct HNode *)){
+struct HNode *hm_lookup(struct HMap *hmap, SearchKey *key, int (*eq)(struct HNode *, SearchKey *)){
     hm_help_resizing(hmap);
     struct HNode **from = h_lookup(&hmap->t1, key, eq);
     if(from != NULL){
@@ -111,7 +110,7 @@ void hm_insert(struct HMap *hmap, struct HNode *node){
     hm_help_resizing(hmap);
 }
 
-struct HNode *hm_pop(struct HMap *hmap, struct HNode *key, int  (*eq)(struct HNode *, struct HNode *)){
+struct HNode *hm_pop(struct HMap *hmap, SearchKey *key, int  (*eq)(struct HNode *, SearchKey *)){
     hm_help_resizing(hmap);
     struct HNode **from = h_lookup(&hmap->t1,key, eq);
     if(from){
@@ -144,17 +143,14 @@ unsigned long hash( char *str)
     return hash;
 }
 
-int entry_eq(struct HNode *lhs, struct HNode *rhs) {
-    if(lhs->type!=rhs->type)
-        return 0;
-    char* lkey, *rkey;
-    if(lhs->type==ENTRY_STR) {
-        lkey = container_of(lhs, struct Entry_Str, node)->key;
-        rkey = container_of(rhs, struct Entry_Str, node)->key;
+int entry_eq(struct HNode *lhs, SearchKey *rhs) {
+    int node_type = lhs->type;
+    char* lkey, *rkey=rhs->key;
+    if(node_type==ENTRY_STR) {
+        lkey = get_string_container(lhs)->key;
     }
-    else if(lhs->type==ENTRY_STREAM){
-        lkey = container_of(lhs, struct Entry_Stream, node)->key;
-        rkey = container_of(rhs, struct Entry_Stream, node)->key;
+    else if(node_type==ENTRY_STREAM){
+        lkey = get_stream_container(lhs)->key;
     }
     else
         return 1;
@@ -202,7 +198,7 @@ int h_scan(char **ret, struct HTab* htab){
         struct HNode **from = &htab->tab[i];
         for (struct HNode *cur; (cur = *from) != NULL; from = &cur->next) {
 
-            if(!entry_expired(from, NULL, htab, &entry, 5))
+        if(!entry_expired(from, NULL, htab, &entry, 5))
             {
                 ret[idx++] = entry.key;
             }
@@ -239,13 +235,15 @@ void set_expiry(struct timeval* tm, long ms){
 void do_set (char **commands, int commandLen, struct HMap* hmap){
 	if(commandLen<3)
 		return;
-	struct Entry_Str keyEntry;
 	char* key = commands[1], *value = commands[2];
-	keyEntry.node.hcode = hash(key);
+    SearchKey keyEntry;
+    keyEntry.hcode = hash(key);
 	keyEntry.key=key;
-	struct HNode* node = hm_lookup(hmap,  &keyEntry.node, entry_eq);
+
+
+	struct HNode* node = hm_lookup(hmap,  &keyEntry, entry_eq);
 	if(node){
-		struct Entry_Str * existing = container_of(node, struct Entry_Str, node);
+		struct Entry_Str * existing = get_string_container(node);
 		free(existing->value);
 		existing->value = malloc(strlen(value)+1);
 		strcpy(existing->value, value);
@@ -273,20 +271,15 @@ void do_set (char **commands, int commandLen, struct HMap* hmap){
 char* do_get(char** commands, int commandLen, struct HMap* hmap){
 	if(commandLen<2)
 		return NULL;
-	struct Entry_Str key;
-	key.node.hcode = hash(commands[1]);
-	key.key = commands[1];
-    key.node.type=ENTRY_STR;
-	struct HNode* node = hm_lookup(hmap, &key.node, entry_eq);
+
+    SearchKey keyEntry;
+    keyEntry.hcode = hash(commands[1]);
+    keyEntry.key=commands[1];
+	struct HNode* node = hm_lookup(hmap, &keyEntry, entry_eq);
 	if(!node){
 		return nil;
 	}
-    Entry ret_entry;
-    if(entry_expired(&node, hmap, NULL, &ret_entry, 3)){
-        return nil;
-    }
-
-	return ret_entry.value;
+	return get_string_container(node)->value;
 }
 
 bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entry* ret_entry ,int flags){
@@ -294,13 +287,17 @@ bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entr
     bool ret;
     void* entry;
     int node_type = (*node)->type;
+    SearchKey key;
+    key.hcode = (*node)->hcode;
     if(node_type==ENTRY_STR) {
-        entry = container_of(*node, struct Entry_Str, node);
+        entry = get_string_container(*node);
         expiry = ((struct Entry_Str*)entry)->expiry;
+        key.key =((struct Entry_Str*)entry)->key;
     }
     else if(node_type==ENTRY_STREAM){
-        entry = container_of(*node, struct Entry_Stream, node);
+        entry = get_stream_container(*node);
         expiry = ((struct Entry_Stream*)entry)->expiry;
+        key.key =((struct Entry_Stream*)entry)->key;
     }
     ret = expiry.tv_sec != 0 && check_expired(&expiry);
 
@@ -308,21 +305,19 @@ bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entr
         if(flags&4)
             h_detach(tab, node);
 
-        if(flags&2)
-            hm_pop(map, *node, entry_eq);
-
+        if(flags&2) {
+            hm_pop(map, &key, entry_eq);
+        }
         if(flags&1)
             delete_entry(entry, node_type);
     }
     else if(ret_entry!=NULL){
+        ret_entry->key = key.key;
         if(node_type==ENTRY_STR) {
-            ret_entry->key = ((struct Entry_Str*)entry)->key;
-            ret_entry->value = ((struct Entry_Str*)entry)->value;
+            ret_entry->str_value = (struct Entry_Str*)entry;
         }
         else if(node_type==ENTRY_STREAM){
-            ret_entry->key = ((struct Entry_Stream*)entry)->key;
-            ret_entry->value = ((struct Entry_Stream*)entry)->value;
-            ret_entry->id = ((struct Entry_Stream*)entry)->id;
+            ret_entry->stream_value = (struct Entry_Stream*)entry;
         }
     }
     return ret;

@@ -7,5 +7,6 @@ add_executable(codecrafters_redis_c
         app/hashset.c
         app/parser.c
         app/message.c
-        app/replication.c)
+        app/replication.c
+        app/stream.c)
 
