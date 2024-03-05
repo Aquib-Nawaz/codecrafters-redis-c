@@ -46,6 +46,27 @@ void type_command(int connFd, char* key, struct HMap* hmap) {
     free(writeBuffer);
 }
 
+struct StreamData* create_stream_data(char ** commands, int commandLen){
+
+    struct StreamData* data = malloc(sizeof *data);
+    data->id = malloc(strlen(commands[0])+1);
+    sprintf(data->id, "%s", commands[0]);
+    data->len = 0;
+
+    data->keys = malloc(sizeof(char*)*(commandLen-3)/2);
+    data->values = malloc(sizeof(char*)*(commandLen-3)/2);
+
+    for(int i=1;i+1<commandLen;i+=2){
+        data->keys[data->len] = malloc(strlen(commands[i]));
+        sprintf(data->keys[data->len], "%s", commands[i]);
+        data->values[data->len] = malloc(strlen(commands[i+1]));
+        sprintf(data->values[data->len], "%s", commands[i+1]);
+        data->len++;
+    }
+    return data;
+}
+
+
 void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap){
     if(commandLen<3){
         return;
@@ -56,6 +77,7 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
             };
     struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
     struct Entry_Stream* entry = NULL;
+
     if(node){
         if(node->type==ENTRY_STR){
             delete_entry(get_string_container(node),node->type);
@@ -64,6 +86,16 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
             entry = get_stream_container(node);
         }
     }
+
+    char* id_start;
+    long new_millis = strtol(commands[2], &id_start, 10);
+    long new_id = strtol(id_start+1, NULL, 10);
+
+    if(new_millis < 0 || new_id <0 ||(new_millis==0 && new_id==0)){
+        send_helper(connFd, ID_00_ERROR, strlen(ID_00_ERROR));
+        return;
+    }
+
     if(!entry){
         entry = malloc(sizeof *entry);
         entry->key = malloc(strlen (commands[1])+1);
@@ -76,25 +108,26 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
         entry->len = 0;
         entry->data = NULL;
     }
+    else{
+        //Validate that id is smaller than current id
+        long curr_millis = strtol(entry->data->id, &id_start, 10);
+        long curr_id = strtol(id_start+1, NULL, 10);
 
-    struct StreamData* data = malloc(sizeof *data);
-    data->prev = entry->data;
-    data->id = malloc(strlen(commands[2])+1);
-    sprintf(data->id, "%s", commands[2]);
-    data->len = 0;
-    entry->data = data;
+        if(strcmp("*",commands[2])!=0){
 
-    data->keys = malloc(sizeof(char*)*(commandLen-3)/2);
-    data->values = malloc(sizeof(char*)*(commandLen-3)/2);
-
-    for(int i=3;i+1<commandLen;i+=2){
-        data->keys[data->len] = malloc(strlen(commands[i]));
-        sprintf(data->keys[data->len], "%s", commands[i]);
-        data->values[data->len] = malloc(strlen(commands[i+1]));
-        sprintf(data->values[data->len], "%s", commands[i+1]);
-        data->len++;
+           if(new_millis<curr_millis || (new_millis==curr_millis && new_id<=curr_id)){
+                printf("Greater Than Error\n");
+               fflush(stdout);
+                send_helper(connFd, ID_GREATER_THAN_ERR, strlen(ID_GREATER_THAN_ERR));
+                return;
+            }
+        }
     }
 
+    struct StreamData* data = create_stream_data(commands+2, commandLen-2);
+
+    data->prev = entry->data;
+    entry->data = data;
     entry->len++;
 
     char* writeBuffer;
