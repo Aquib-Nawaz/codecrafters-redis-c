@@ -24,7 +24,7 @@ pthread_t replica_thread[MAX_REPLICAS];
 pthread_mutex_t ack_mutex = PTHREAD_MUTEX_INITIALIZER;
 int replicas_offset[MAX_REPLICAS]={0};
 
-void send_helper(int connFd, char* writeBuffer,int value_len){
+static void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
     do {
         sentBytes = send(connFd, writeBuffer, value_len, 0);

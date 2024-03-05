@@ -323,6 +323,16 @@ bool entry_expired(struct HNode **node, struct HMap* map, struct HTab* tab, Entr
     return ret;
 }
 
+struct Entry_Str* get_string_container(struct HNode* _node){
+    return (struct Entry_Str*)container_of(_node, struct Entry_Str, node);
+}
+
+struct Entry_Stream* get_stream_container(struct HNode* _node){
+    return (struct Entry_Stream*)container_of(_node, struct Entry_Stream, node);
+}
+
+
+
 #if 0
 struct {
     struct HMap db;

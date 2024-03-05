@@ -86,10 +86,7 @@ int check_expired(struct timeval *time);
 int hm_scan(char ***, struct HMap *);
 bool entry_expired(struct HNode **node, struct HMap*, struct HTab*, Entry*, int flags);
 
-struct Entry_Str* get_string_container(struct HNode* _node){
-    return container_of(_node, struct Entry_Str, node);
-}
-struct Entry_Stream* get_stream_container(struct HNode* _node){
-    return container_of(_node, struct Entry_Stream, node);
-}
+struct Entry_Str* get_string_container(struct HNode* _node);
+struct Entry_Stream* get_stream_container(struct HNode* _node);
+
 #endif //REDIS_HASHSET_H

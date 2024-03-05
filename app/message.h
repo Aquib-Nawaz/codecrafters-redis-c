@@ -20,13 +20,12 @@ int calculate_buffer_len(char **, int);
 #define replconf "replconf"
 #define psync "psync"
 #define WAIT "wait"
-#define type "type"
+#define TYPE "type"
 
 
 static char* set = "set";
 static char* ok = "+OK\r\n";
-static char* nil = "$-1\r\n";
-static char* nullBulk = "";
+#define NIL "$-1\r\n"
 static char* config = "config";
 static char* DIR = "dir";
 static char* DBFILENAME = "dbfilename";

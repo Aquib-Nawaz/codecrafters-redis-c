@@ -7,7 +7,7 @@
 #include "stream.h"
 #include "message.h"
 
-void send_helper(int connFd, char* writeBuffer,int value_len){
+static void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
     do {
         sentBytes = send(connFd, writeBuffer, value_len, 0);
@@ -35,6 +35,10 @@ void type_command(int connFd, char* key, struct HMap* hmap) {
     }
     else if(node->type==ENTRY_STREAM){
         to_send = "stream";
+    }
+    else{
+        printf("Unknown type\n");
+        return;
     }
     value_len = serialize_str(&writeBuffer, to_send, 0);
     send_helper(connFd, writeBuffer, value_len);
