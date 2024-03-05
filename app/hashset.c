@@ -163,13 +163,28 @@ void delete_str(struct Entry_Str* entry){
     free(entry);
 }
 
-void delete_stream(struct Entry_Stream* entry){
-    free(entry->value);
-    free(entry->key);
-    free(entry->id);
-    free(entry);
+void delete_stream_data(struct StreamData* data){
+    int i;
+    for(i=0; i<data->len; i++){
+        free(data->keys[i]);
+        free(data->values[i]);
+    }
+    free(data->keys);
+    free(data->values);
+    free(data->id);
+    free(data);
 }
 
+void delete_stream(struct Entry_Stream* entry){
+    free(entry->key);
+    struct StreamData* current = entry->data;
+    while(current){
+        struct StreamData* prev = current->prev;
+        delete_stream_data(current);
+        current = prev;
+    }
+    free(entry);
+}
 
 void delete_entry(void * entry, int type){
     if(type==ENTRY_STR)

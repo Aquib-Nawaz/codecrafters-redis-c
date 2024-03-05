@@ -124,6 +124,9 @@ void parseMessage(char **commands, int commandLen, int connFd){
             if(commandLen>=2)
                 type_command(connFd, commands[1], &g_data.db);
         }
+		else if(strcmp(commands[0], "xadd")==0){
+			xadd_command(connFd, commands, commandLen, &g_data.db);
+		}
     }
 }
 

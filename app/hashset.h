@@ -33,6 +33,14 @@ struct HMap{
     size_t resizing_pos;
 };
 
+struct StreamData{
+    char* id;
+    char **keys;
+    char ** values;
+    int len;
+    struct StreamData* prev;
+};
+
 struct Entry_Str{
     struct HNode node;
     char* key;
@@ -43,9 +51,9 @@ struct Entry_Str{
 struct Entry_Stream{
     struct HNode node;
     char* key;
-    char* value;
     struct timeval expiry;
-    char* id;
+    int len;
+    struct StreamData* data;
 };
 
 typedef struct {

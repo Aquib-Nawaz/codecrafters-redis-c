@@ -33,7 +33,7 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
     return str_len+3;
 }
 
-int calculate_buffer_len(char ** strs, int size){
+int calculate_buffer_len(char *  * strs, int size){
     //*size\r\n$len\r\ndir\r\n
     int retLength = 0;
     retLength += snprintf(NULL, 0, "*%d\r\n" ,size);
