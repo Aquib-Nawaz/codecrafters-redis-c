@@ -287,7 +287,24 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
     SearchKey searchKey;
     char send_buffer[200];
 
-    snprintf(send_buffer, 200, ARRAY_PREFIX, numStreams);
+    int found=0;
+    for(int i=0; i<numStreams; i++) {
+        searchKey.hcode = hash(commands[i]);
+        searchKey.key = commands[i];
+        struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
+        if(!node || node->type==ENTRY_STR){
+            send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
+            continue;
+        }
+        found++;
+    }
+
+    if(!found){
+        send_helper(connFd, nil, (int)strlen(nil));
+        return;
+    }
+
+    snprintf(send_buffer, 200, ARRAY_PREFIX, found);
     send_helper(connFd, send_buffer, (int)strlen(send_buffer));
 
     for(int i=0; i<numStreams; i++){
@@ -297,7 +314,7 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
         struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
         if(!node || node->type==ENTRY_STR){
             send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
-            return;
+            continue;
         }
         struct Entry_Stream* stream = get_stream_container(node);
         snprintf(send_buffer, 200, ARRAY_PREFIX, 2);
