@@ -21,6 +21,14 @@ static void send_helper(int connFd, char* writeBuffer,int value_len){
     }
 }
 
+int64_t currentTimeMillis() {
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    int64_t s1 = (int64_t)(time.tv_sec) * 1000;
+    int64_t s2 = (time.tv_usec / 1000);
+    return s1 + s2;
+}
+
 void type_command(int connFd, char* key, struct HMap* hmap) {
     SearchKey searchKey = {
         .hcode = hash(key),
@@ -77,7 +85,7 @@ char* validate_and_generate_key(char* new_id_str, char* top_id, int* error){
         new_millis = strtol(new_id_str, &id_start, 10);
     }
     else{
-        new_millis = curr_millis;
+        new_millis = currentTimeMillis();
         id_start = strchr(new_id_str, '-');
     }
 
