@@ -12,7 +12,7 @@
 static void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
     do {
-        sentBytes = send(connFd, writeBuffer, value_len, 0);
+        sentBytes = (int)send(connFd, writeBuffer, value_len, 0);
         value_len -= sentBytes;
         writeBuffer += sentBytes;
     }while(sentBytes!=-1 && value_len>0);
@@ -101,7 +101,7 @@ struct StreamData* create_stream_data(char ** commands, int commandLen){
 
 char* validate_and_generate_key(char* new_id_str, char* top_id, int* error){
     char* id_start;
-    long new_millis=-1,new_id=-1;
+    long new_millis,new_id;
     long curr_millis = strtol(top_id, &id_start, 10);
     long curr_id = strtol(id_start+1, NULL, 10);
     *error=1;
@@ -203,6 +203,33 @@ int calculate_stream_data_len (struct StreamData* it){
     return value_len;
 }
 
+void serialize_stream(struct StreamData* start,  struct StreamData* end, int num_entries, char* writeBuffer, int value_len){
+
+    struct StreamData* it;
+    snprintf(writeBuffer, value_len+1, ARRAY_PREFIX, num_entries);
+
+    int current_pos = value_len;
+    for(it = start; it!=end; it=it->prev) {
+        int it_data_len = calculate_stream_data_len(it);
+        current_pos-=it_data_len;
+
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2);
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                strlen(it->id), it->id);
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2 * it->len);
+        for (int i = 0; i < it->len; i++) {
+            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                    strlen(it->keys[i]), it->keys[i]);
+            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                    strlen(it->values[i]), it->values[i]);
+        }
+        if(current_pos!=value_len)
+            writeBuffer[current_pos]='*';
+        current_pos-=it_data_len;
+    }
+
+}
+
 void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hmap){
     if(commandLen<4){
         return;
@@ -243,32 +270,9 @@ void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hm
     value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
 
     char* writeBuffer = malloc(value_len+1);
-    int current_pos = 0;
+    serialize_stream(cur, it, num_entries, writeBuffer, value_len);
 
-    snprintf(writeBuffer, value_len+1, ARRAY_PREFIX, num_entries);
-
-    current_pos = value_len;
-
-    for(it = cur; it&& compare_ids(it->id, st_id)>=0; it=it->prev) {
-        int it_data_len = calculate_stream_data_len(it);
-        current_pos-=it_data_len;
-
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2);
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
-                                strlen(it->id), it->id);
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2 * it->len);
-        for (int i = 0; i < it->len; i++) {
-            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
-                                    strlen(it->keys[i]), it->keys[i]);
-            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
-                                    strlen(it->values[i]), it->values[i]);
-        }
-        if(current_pos!=value_len)
-            writeBuffer[current_pos]='*';
-        current_pos-=it_data_len;
-    }
-
-//    printf("XRANGE RESULT: %s\n", writeBuffer);
+//    printf(XRANGE RESULT: %s\n", writeBuffer);
     send_helper(connFd, writeBuffer, value_len);
     free(writeBuffer);
 }
