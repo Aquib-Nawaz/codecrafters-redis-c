@@ -117,7 +117,7 @@ void parseMessage(char **commands, int commandLen, int connFd){
 				args->expected_replica = (int)strtol(commands[1], NULL, 10);
 				args->waitTime = strtol(commands[2], NULL, 10);
 				pthread_t thread;
-				pthread_create(&thread, NULL, wait_command, args);
+ 				pthread_create(&thread, NULL, wait_command, args);
 			}
 		}
         else if(strcmp(commands[0], TYPE)==0){
@@ -130,7 +130,9 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else if(strcmp(commands[0], "xrange")==0){
 			xrange_command(connFd, commands, commandLen, &g_data.db);
 		}
-
+		else if(strcmp(commands[0], "xread")==0){
+			xread_command(connFd, commands, commandLen, &g_data.db);
+		}
     }
 }
 

@@ -276,3 +276,46 @@ void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hm
     send_helper(connFd, writeBuffer, value_len);
     free(writeBuffer);
 }
+
+void xread_command(int connFd, char** commands, int commandLen, struct HMap* hmap){
+    if(commandLen<4)
+        return;
+    commands+=2;
+    commandLen-=2;
+    int numStreams = commandLen/2;
+    struct StreamData* stream_data;
+    SearchKey searchKey;
+    char send_buffer[200];
+
+    snprintf(send_buffer, 200, ARRAY_PREFIX, numStreams);
+    send_helper(connFd, send_buffer, (int)strlen(send_buffer));
+
+    for(int i=0; i<numStreams; i++){
+
+        searchKey.hcode = hash(commands[i]);
+        searchKey.key = commands[i];
+        struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
+        if(!node || node->type==ENTRY_STR){
+            send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
+            return;
+        }
+        struct Entry_Stream* stream = get_stream_container(node);
+        snprintf(send_buffer, 200, ARRAY_PREFIX, 2);
+        snprintf(send_buffer+ strlen(send_buffer), 200- strlen(send_buffer), STRING_DATA_FORMAT,
+                 strlen(stream->key), stream->key);
+        send_helper(connFd, send_buffer, (int)strlen(send_buffer));
+        stream_data = stream->data;
+        int value_len=0, num_entries=0;
+        struct StreamData* it;
+        char* st = commands[numStreams+i];
+        for(it = stream_data; it && compare_ids(it->id, st)>0; it=it->prev){
+            value_len+= calculate_stream_data_len(it);
+            num_entries++;
+        }
+        value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
+        char* writeBuffer = malloc(value_len+1);
+        serialize_stream(stream_data, it, num_entries, writeBuffer, value_len);
+        send_helper(connFd, writeBuffer, value_len);
+        free(writeBuffer);
+    }
+}

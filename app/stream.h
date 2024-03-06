@@ -13,5 +13,6 @@
 void type_command(int,char*,struct HMap*);
 void xadd_command(int, char**, int, struct HMap*);
 void xrange_command(int, char**, int, struct HMap*);
+void xread_command(int, char**, int, struct HMap*);
 
 #endif //CODECRAFTERS_REDIS_C_STREAMS_H
