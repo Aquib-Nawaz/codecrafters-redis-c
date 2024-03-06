@@ -22,6 +22,10 @@ static void send_helper(int connFd, char* writeBuffer,int value_len){
 }
 
 int compare_ids(char* id1, char* id2) {
+    if(strcmp(id2,"+")==0)
+        return -1;
+    else if(strcmp(id2,"-")==0)
+        return 1;
     long id1_ms,id2_ms, id1_seq=0, id2_seq=0;
     char * sep=0;
 
