@@ -22,6 +22,10 @@ int calculate_buffer_len(char **, int);
 #define WAIT "wait"
 #define TYPE "type"
 
+#define STRING_DATA_FORMAT "$%zu\r\n%s\r\n"
+#define EMPTY_ARRAY "*0\r\n"
+#define ARRAY_PREFIX "*%d\r\n"
+
 
 static char* set = "set";
 static char* ok = "+OK\r\n";

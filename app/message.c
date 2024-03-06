@@ -21,9 +21,9 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
         return str_len;
     }
     if(bulk){
-        int ret_len = snprintf(NULL, 0, "$%zu\r\n%s\r\n", str_len, str);
+        int ret_len = snprintf(NULL, 0, STRING_DATA_FORMAT, str_len, str);
         *writeBuffer = calloc(ret_len+1, sizeof (char ));
-        return snprintf(*writeBuffer, ret_len+1, "$%zu\r\n%s\r\n",
+        return snprintf(*writeBuffer, ret_len+1, STRING_DATA_FORMAT,
                  str_len, str);
     }
     *writeBuffer = calloc(str_len + 4, sizeof(char));
@@ -33,24 +33,23 @@ int serialize_str(char **writeBuffer, char* str, int bulk){
     return str_len+3;
 }
 
-int calculate_buffer_len(char *  * strs, int size){
+int calculate_buffer_len(char ** strs, int size){
     //*size\r\n$len\r\ndir\r\n
     int retLength = 0;
-    retLength += snprintf(NULL, 0, "*%d\r\n" ,size);
     for(int i=0; i<size; i++){
-        retLength += snprintf(NULL, 0, "$%zu\r\n%s\r\n", strlen(strs[i]), strs[i]);
+        retLength += snprintf(NULL, 0, STRING_DATA_FORMAT, strlen(strs[i]), strs[i]);
     }
     return retLength;
 }
 
 int serialize_strs(char **writeBuffer, char** strs, int size){
-    int writeBufferLen = calculate_buffer_len(strs, size);
+    int writeBufferLen = calculate_buffer_len(strs, size)+ snprintf(NULL, 0, "*%d\r\n" ,size);;
     *writeBuffer = malloc(writeBufferLen+1);
     int idx=0;
     idx += snprintf(*writeBuffer, writeBufferLen+1, "*%d\r\n" ,size);
     for(int i=0; i<size; i++){
         idx += snprintf(*writeBuffer + idx, writeBufferLen+1-idx,
-                        "$%zu\r\n%s\r\n", strlen(strs[i]), strs[i]);
+                        STRING_DATA_FORMAT, strlen(strs[i]), strs[i]);
     }
     return idx;
 }

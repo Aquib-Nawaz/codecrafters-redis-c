@@ -127,6 +127,10 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		else if(strcmp(commands[0], "xadd")==0){
 			xadd_command(connFd, commands, commandLen, &g_data.db);
 		}
+		else if(strcmp(commands[0], "xrange")==0){
+			xrange_command(connFd, commands, commandLen, &g_data.db);
+		}
+
     }
 }
 

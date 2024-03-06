@@ -21,6 +21,26 @@ static void send_helper(int connFd, char* writeBuffer,int value_len){
     }
 }
 
+int compare_ids(char* id1, char* id2) {
+    long id1_ms,id2_ms, id1_seq=0, id2_seq=0;
+    char * sep=0;
+
+    id1_ms = strtol(id1, &sep, 10);
+    if(sep)
+        id1_seq = strtol(sep+1, NULL, 10);
+
+    id2_ms = strtol(id2, &sep, 10);
+    if(sep)
+        id2_seq = strtol(sep+1, NULL, 10);
+
+    if(id1_ms>id2_ms || (id1_ms==id2_ms && id1_seq>id2_seq)){
+        return 1;
+    }
+    if((id1_ms==id2_ms && id1_seq==id2_seq))
+        return 0;
+    return -1;
+}
+
 int64_t currentTimeMillis() {
     struct timeval time;
     gettimeofday(&time, NULL);
@@ -141,7 +161,7 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
         entry->node.type = ENTRY_STREAM;
         entry->node.hcode = searchKey.hcode;
         hm_insert(hmap, &entry->node);
-
+        entry->expiry.tv_sec=0;
         entry->len = 0;
         entry->data = NULL;
     }
@@ -167,4 +187,84 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
     send_helper(connFd, writeBuffer, value_len);
     free(writeBuffer);
 
+}
+
+int calculate_stream_data_len (struct StreamData* it){
+    int value_len = 0;
+    value_len+= snprintf(NULL, 0, ARRAY_PREFIX, 2);
+    value_len+= snprintf(NULL, 0, STRING_DATA_FORMAT, strlen(it->id),it->id);
+    value_len+= snprintf(NULL, 0, ARRAY_PREFIX, 2*it->len);
+    value_len+= calculate_buffer_len(it->keys, it->len);
+    value_len+= calculate_buffer_len(it->values, it->len);
+    return value_len;
+}
+
+void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hmap){
+    if(commandLen<4){
+        return;
+    }
+    SearchKey searchKey = {
+            .key=commands[1],
+            .hcode=hash(commands[1]),
+            };
+    struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
+    if(!node || node->type==ENTRY_STR){
+        send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
+        return;
+    }
+
+    struct Entry_Stream* stream = get_stream_container(node);
+    struct StreamData* cur = stream->data;
+    char* st_id = commands[2];
+    char* end_id = commands[3];
+
+    while(cur){
+        if(compare_ids(cur->id, end_id)<=0)
+            break;
+        cur = cur->prev;
+    }
+
+    if(!cur){
+        send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
+        return;
+    }
+
+    int value_len=0, num_entries=0;
+    struct StreamData* it;
+    for(it = cur; it&& compare_ids(it->id, st_id)>=0; it=it->prev){
+        value_len+= calculate_stream_data_len(it);
+        num_entries++;
+    }
+
+    value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
+
+    char* writeBuffer = malloc(value_len+1);
+    int current_pos = 0;
+
+    snprintf(writeBuffer, value_len+1, ARRAY_PREFIX, num_entries);
+
+    current_pos = value_len;
+
+    for(it = cur; it&& compare_ids(it->id, st_id)>=0; it=it->prev) {
+        int it_data_len = calculate_stream_data_len(it);
+        current_pos-=it_data_len;
+
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2);
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                strlen(it->id), it->id);
+        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2 * it->len);
+        for (int i = 0; i < it->len; i++) {
+            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                    strlen(it->keys[i]), it->keys[i]);
+            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+                                    strlen(it->values[i]), it->values[i]);
+        }
+        if(current_pos!=value_len)
+            writeBuffer[current_pos]='*';
+        current_pos-=it_data_len;
+    }
+
+//    printf("XRANGE RESULT: %s\n", writeBuffer);
+    send_helper(connFd, writeBuffer, value_len);
+    free(writeBuffer);
 }
