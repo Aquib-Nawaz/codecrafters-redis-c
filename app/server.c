@@ -132,9 +132,26 @@ void parseMessage(char **commands, int commandLen, int connFd){
 		}
 		else if(strcmp(commands[0], "xread")==0){
             int error;
-			xread_command(connFd, commands, commandLen, &g_data.db, &error);
-            if(error)
-                send(connFd, nil, (int)strlen(nil), 0);
+			if(strcmp(commands[1], "streams")==0){
+				xread_command(connFd, commands+2, commandLen-2, &g_data.db, &error);
+				if(error)
+					send(connFd, nil, (int)strlen(nil), 0);
+			}
+			else if(strcmp(commands[1], "block")==0){
+				long timeout = strtol(commands[2], NULL,10);
+				BlockThread *args = malloc(sizeof *args);
+				args->connFd = connFd;
+				args->timeout = timeout;
+				args->commandLen = commandLen-4;
+				args->commands = malloc((args->commandLen)*sizeof (char*));
+				for(int i=0; i<args->commandLen; i++){
+					args->commands[i] = malloc(strlen(commands[i+4])+1);
+					strcpy(args->commands[i], commands[i+4]);
+				}
+				args->hmap = &g_data.db;
+				pthread_t thread;
+				pthread_create(&thread, NULL, xread_block, args);
+			}
 		}
     }
 }

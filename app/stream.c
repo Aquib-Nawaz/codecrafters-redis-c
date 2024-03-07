@@ -6,8 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
+#include <sys/errno.h>
 #include "stream.h"
 #include "message.h"
+
+pthread_mutex_t xread_block_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t xread_block_cond = PTHREAD_COND_INITIALIZER;
 
 static void send_helper(int connFd, char* writeBuffer,int value_len){
     int sentBytes;
@@ -182,8 +187,12 @@ void xadd_command(int connFd, char** commands, int commandLen, struct HMap* hmap
 
     data->id = id_or_error;
     data->prev = entry->data;
+
+    pthread_mutex_lock(&xread_block_mutex);
     entry->data = data;
     entry->len++;
+    pthread_cond_broadcast(&xread_block_cond);
+    pthread_mutex_unlock(&xread_block_mutex);
 
     char* writeBuffer;
     int value_len;
@@ -281,10 +290,8 @@ void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hm
 
 void xread_command(int connFd, char** commands, int commandLen, struct HMap* hmap, int *error){
     *error=0;
-    if(commandLen<4)
+    if(commandLen<2)
         return;
-    commands+=2;
-    commandLen-=2;
     int numStreams = commandLen/2;
     struct StreamData* stream_data;
     SearchKey searchKey;
@@ -300,11 +307,8 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
             struct Entry_Stream* stream = get_stream_container(node);
             if(stream->data && compare_ids(stream->data->id, commands[i+numStreams])>0){
                 unblocked_streams[found++] = stream;
-                continue;
             }
-            continue;
         }
-        found++;
     }
 
     if(!found){
@@ -333,4 +337,43 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
     }
 }
 
-void *
+void *xread_block(void* args){
+    BlockThread * arguments = (BlockThread*)args;
+    int error;
+    int rt;
+    struct timespec expiry;
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    expiry.tv_sec = time.tv_sec ;
+    expiry.tv_nsec = (time.tv_usec + arguments->timeout*1000L)* 1000L;
+    if(expiry.tv_nsec>=1000000000L){
+        expiry.tv_sec++;
+        expiry.tv_nsec -= 1000000000L;
+    }
+    while(1) {
+        xread_command(arguments->connFd, arguments->commands, arguments->commandLen, arguments->hmap, &error);
+        if(!error)
+            break;
+        if(arguments->timeout!=0){
+            pthread_mutex_lock(&xread_block_mutex);
+            rt = pthread_cond_timedwait(&xread_block_cond, &xread_block_mutex, &expiry);
+            pthread_mutex_unlock(&xread_block_mutex);
+
+            if(rt == ETIMEDOUT){
+                send_helper(arguments->connFd, nil, (int)strlen(nil));
+                break;
+            }
+        }
+        else {
+            pthread_mutex_lock(&xread_block_mutex);
+            pthread_cond_timedwait(&xread_block_cond, &xread_block_mutex, &expiry);
+            pthread_mutex_unlock(&xread_block_mutex);
+        }
+    }
+    for(int i=0;i<arguments->commandLen; i++){
+        free(arguments->commands[i]);
+    }
+    free(arguments->commands);
+    free(args);
+    return NULL;
+}
