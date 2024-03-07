@@ -131,7 +131,10 @@ void parseMessage(char **commands, int commandLen, int connFd){
 			xrange_command(connFd, commands, commandLen, &g_data.db);
 		}
 		else if(strcmp(commands[0], "xread")==0){
-			xread_command(connFd, commands, commandLen, &g_data.db);
+            int error;
+			xread_command(connFd, commands, commandLen, &g_data.db, &error);
+            if(error)
+                send(connFd, nil, (int)strlen(nil), 0);
 		}
     }
 }

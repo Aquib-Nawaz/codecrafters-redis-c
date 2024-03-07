@@ -203,30 +203,39 @@ int calculate_stream_data_len (struct StreamData* it){
     return value_len;
 }
 
-void serialize_stream(struct StreamData* start,  struct StreamData* end, int num_entries, char* writeBuffer, int value_len){
+int serialize_stream(struct StreamData* start,  struct StreamData* end, char** writeBuffer){
 
+    int value_len=0, num_entries=0;
     struct StreamData* it;
-    snprintf(writeBuffer, value_len+1, ARRAY_PREFIX, num_entries);
+    for(it = start; it!=end; it=it->prev){
+        value_len+= calculate_stream_data_len(it);
+        num_entries++;
+    }
+
+    value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
+    * writeBuffer = malloc(value_len+1);
+    snprintf(*writeBuffer, value_len+1, ARRAY_PREFIX, num_entries);
 
     int current_pos = value_len;
     for(it = start; it!=end; it=it->prev) {
         int it_data_len = calculate_stream_data_len(it);
         current_pos-=it_data_len;
 
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2);
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+        current_pos += snprintf(*writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2);
+        current_pos += snprintf(*writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
                                 strlen(it->id), it->id);
-        current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2 * it->len);
+        current_pos += snprintf(*writeBuffer + current_pos, value_len + 1 - current_pos, ARRAY_PREFIX, 2 * it->len);
         for (int i = 0; i < it->len; i++) {
-            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+            current_pos += snprintf(*writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
                                     strlen(it->keys[i]), it->keys[i]);
-            current_pos += snprintf(writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
+            current_pos += snprintf(*writeBuffer + current_pos, value_len + 1 - current_pos, STRING_DATA_FORMAT,
                                     strlen(it->values[i]), it->values[i]);
         }
         if(current_pos!=value_len)
-            writeBuffer[current_pos]='*';
+            (*writeBuffer)[current_pos]='*';
         current_pos-=it_data_len;
     }
+    return value_len;
 
 }
 
@@ -259,25 +268,19 @@ void xrange_command(int connFd, char** commands, int commandLen, struct HMap* hm
         send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
         return;
     }
-
-    int value_len=0, num_entries=0;
-    struct StreamData* it;
-    for(it = cur; it&& compare_ids(it->id, st_id)>=0; it=it->prev){
-        value_len+= calculate_stream_data_len(it);
-        num_entries++;
+    struct StreamData* end = cur;
+    while(end && compare_ids(end->id, st_id)>=0){
+        end = end->prev;
     }
-
-    value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
-
-    char* writeBuffer = malloc(value_len+1);
-    serialize_stream(cur, it, num_entries, writeBuffer, value_len);
-
-//    printf(XRANGE RESULT: %s\n", writeBuffer);
+    char* writeBuffer;
+    int value_len = serialize_stream(cur, end, &writeBuffer);
     send_helper(connFd, writeBuffer, value_len);
     free(writeBuffer);
+
 }
 
-void xread_command(int connFd, char** commands, int commandLen, struct HMap* hmap){
+void xread_command(int connFd, char** commands, int commandLen, struct HMap* hmap, int *error){
+    *error=0;
     if(commandLen<4)
         return;
     commands+=2;
@@ -286,53 +289,48 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
     struct StreamData* stream_data;
     SearchKey searchKey;
     char send_buffer[200];
-
+    struct Entry_Stream* unblocked_streams [numStreams];
     int found=0;
+
     for(int i=0; i<numStreams; i++) {
         searchKey.hcode = hash(commands[i]);
         searchKey.key = commands[i];
         struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
-        if(!node || node->type==ENTRY_STR){
-            send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
+        if(node && node->type==ENTRY_STREAM){
+            struct Entry_Stream* stream = get_stream_container(node);
+            if(stream->data && compare_ids(stream->data->id, commands[i+numStreams])>0){
+                unblocked_streams[found++] = stream;
+                continue;
+            }
             continue;
         }
         found++;
     }
 
     if(!found){
-        send_helper(connFd, nil, (int)strlen(nil));
+        *error=1;
         return;
     }
 
     snprintf(send_buffer, 200, ARRAY_PREFIX, found);
     send_helper(connFd, send_buffer, (int)strlen(send_buffer));
 
-    for(int i=0; i<numStreams; i++){
-
-        searchKey.hcode = hash(commands[i]);
-        searchKey.key = commands[i];
-        struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
-        if(!node || node->type==ENTRY_STR){
-            send_helper(connFd, EMPTY_ARRAY, (int)strlen(EMPTY_ARRAY));
-            continue;
-        }
-        struct Entry_Stream* stream = get_stream_container(node);
+    for(int i=0; i<found; i++){
+        struct Entry_Stream* stream = unblocked_streams[i];
         snprintf(send_buffer, 200, ARRAY_PREFIX, 2);
         snprintf(send_buffer+ strlen(send_buffer), 200- strlen(send_buffer), STRING_DATA_FORMAT,
                  strlen(stream->key), stream->key);
         send_helper(connFd, send_buffer, (int)strlen(send_buffer));
         stream_data = stream->data;
-        int value_len=0, num_entries=0;
         struct StreamData* it;
         char* st = commands[numStreams+i];
         for(it = stream_data; it && compare_ids(it->id, st)>0; it=it->prev){
-            value_len+= calculate_stream_data_len(it);
-            num_entries++;
         }
-        value_len+= snprintf(NULL, 0, ARRAY_PREFIX, num_entries);
-        char* writeBuffer = malloc(value_len+1);
-        serialize_stream(stream_data, it, num_entries, writeBuffer, value_len);
+        char* writeBuffer;
+        int value_len = serialize_stream(stream_data, it,  &writeBuffer);
         send_helper(connFd, writeBuffer, value_len);
         free(writeBuffer);
     }
 }
+
+void *
