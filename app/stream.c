@@ -305,6 +305,14 @@ void xread_command(int connFd, char** commands, int commandLen, struct HMap* hma
         struct HNode *node = hm_lookup(hmap, &searchKey, entry_eq);
         if(node && node->type==ENTRY_STREAM){
             struct Entry_Stream* stream = get_stream_container(node);
+            if(strcmp(commands[i+numStreams],"$")==0) {
+                if (stream->data) {
+                    commands[i + numStreams] = realloc(commands[i + numStreams], strlen(stream->data->id) + 1);
+                    strcpy(commands[i + numStreams], stream->data->id);
+                }
+                else
+                    *(commands[i + numStreams]) = '-';
+            }
             if(stream->data && compare_ids(stream->data->id, commands[i+numStreams])>0){
                 unblocked_streams[found++] = stream;
             }
