@@ -352,8 +352,8 @@ void *xread_block(void* args){
     struct timespec expiry;
     struct timeval time;
     gettimeofday(&time, NULL);
-    expiry.tv_sec = time.tv_sec ;
-    expiry.tv_nsec = (time.tv_usec + arguments->timeout*1000L)* 1000L;
+    expiry.tv_sec = time.tv_sec +arguments->timeout/1000L;
+    expiry.tv_nsec = (time.tv_usec + (arguments->timeout%1000L)*1000L)* 1000L;
     if(expiry.tv_nsec>=1000000000L){
         expiry.tv_sec++;
         expiry.tv_nsec -= 1000000000L;
