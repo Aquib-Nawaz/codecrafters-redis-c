@@ -1,34 +1,83 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/a38aa92b-90af-449c-9c2a-d41562be67d2)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# Codecrafters Redis Challenge – C Implementation
 
-This is a starting point for C solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+This repository contains a minimal Redis server implementation written in C for the [Codecrafters Redis challenge](https://codecrafters.io/challenges/redis).
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+- **TCP server**: Accepts connections from Redis clients.
+- **RESP protocol parsing**: Handles the Redis Serialization Protocol for requests and responses.
+- **Key-value store**: Supports basic Redis commands (`PING`, `ECHO`, `SET`, `GET`).
+- **Key expiry (TTL)**: Supports time-to-live for keys.
+- **Streams and Replication**: Includes stream and replication modules for more advanced Redis features.
 
-# Passing the first stage
+## Folder Structure
 
-The entry point for your Redis implementation is in `app/server.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
-
-```sh
-git add .
-git commit -m "pass 1st stage" # any msg
-git push origin master
+```
+app/
+├── hashset.c       # Hashset (key-value store) implementation
+├── hashset.h
+├── message.c       # Handles message/request/response logic
+├── message.h
+├── parser.c        # RESP protocol parser
+├── parser.h
+├── replication.c   # Redis replication logic
+├── replication.h
+├── server.c        # TCP server and main event loop
+├── stream.c        # Stream data-type and logic
+├── stream.h
 ```
 
-That's all!
+## Getting Started
 
-# Stage 2 & beyond
+### Prerequisites
 
-Note: This section is for stages 2 and beyond.
+- GCC or Clang (C99 compatible)
+- `make` utility
+- Linux/macOS (Windows support may vary)
+- [`redis-cli`](https://redis.io/docs/ui/cli/) or [`netcat`](https://nmap.org/ncat/) for manual testing
 
-1. Ensure you have `gcc` installed locally
-1. Run `./spawn_redis_server.sh` to run your Redis server, which is implemented
-   in `app/server.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+### Build
+
+```sh
+cd app
+make
+```
+
+This produces an executable (e.g., `redis-server`).
+
+### Run
+
+```sh
+./redis-server
+```
+
+By default, the server listens on port 6379.
+
+### Connect & Test
+
+Using `redis-cli`:
+
+```sh
+redis-cli -p 6379 ping
+redis-cli -p 6379 set foo bar
+redis-cli -p 6379 get foo
+```
+
+Or with `nc`:
+
+```sh
+echo -en "*1\r\n$4\r\nPING\r\n" | nc localhost 6379
+```
+
+## Extending
+
+- Add new commands in `message.c` and update protocol handling in `parser.c`.
+- Stream and replication features can be extended by editing `stream.c` and `replication.c`.
+
+## License
+
+MIT License
+
+---
+
+Inspired by [Redis](https://redis.io/). Built for the [Codecrafters Redis challenge](https://codecrafters.io/challenges/redis).
