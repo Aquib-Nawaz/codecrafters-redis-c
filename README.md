@@ -36,19 +36,10 @@ app/
 - Linux/macOS (Windows support may vary)
 - [`redis-cli`](https://redis.io/docs/ui/cli/) or [`netcat`](https://nmap.org/ncat/) for manual testing
 
-### Build
+### Build And Run
 
 ```sh
-cd app
-make
-```
-
-This produces an executable (e.g., `redis-server`).
-
-### Run
-
-```sh
-./redis-server
+./spawn_redis_server.sh
 ```
 
 By default, the server listens on port 6379.
